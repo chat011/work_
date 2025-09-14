@@ -1,0 +1,415 @@
+{
+  "metadata": {
+    "timestamp": "20250907_193929",
+    "total_products": 3,
+    "total_pages_scraped": 3,
+    "scraper_type": "fallback_simple",
+    "ai_stats": {
+      "pages_analyzed": 0,
+      "products_found": 0,
+      "pagination_pages_discovered": 0,
+      "ai_extraction_success": 0,
+      "ai_extraction_failures": 0,
+      "fallback_extractions": 0
+    }
+  },
+  "products": [
+    {
+      "product_name": "MAHIRA RED FLORAL SAREE",
+      "price": 4949.0,
+      "discounted_price": null,
+      "product_images": [
+        "https://deashaindia.com/cdn/shop/files/002A4882.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4881.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4874.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4871.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4866.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4855.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4853.jpg?v=1744140088&width=1946",
+        "https://deashaindia.com/cdn/shop/files/002A4880.jpg?v=1744140088&width=1946"
+      ],
+      "description": "FABRIC• Blouse - Georgette• Saree - GeorgettePRODUCT DETAILS• Neckline – Sweetheart• Model Height – 5’6”• The model is wearing XS size• Number of Pieces - 2WASHING INSTRUCTIONDry Clean only. Please don't spray deodorant or perfumes directly on the fabric.DISCLAIMEROur products are photographed professionally under controlled lighting. Colours tend to be witnessed differently depending on various factors such as shot angles, lighting, background colours and warm/cold colours. As a result, prints and colours may vary 10-12%. Nevertheless, we try to match the tones as close to the original product colours as possible.CUSTOMIZATIONWe offer 'customization' in size, length, sleeve and necklines. Please refer to details under our customize tab.",
+      "sizes": [],
+      "colors": [],
+      "material": "• Blouse - Georgette\n• Saree - Georgette",
+      "metadata": {
+        "platform": "shopify",
+        "extracted_at": "2025-09-07T19:03:09.428253",
+        "availability": "InStock",
+        "sku": "",
+        "brand": "Deasha India",
+        "categories": [
+          "BANNO KE LIBAAS",
+          "HANDPAINTED HUES",
+          "ADAH",
+          "BEHR | THE LEHERIYA EDIT'24",
+          "SAJDA| THE WEDDING EDIT'24",
+          "AMORA'24 | THE VACATION EDIT",
+          "JASHN| THE FESTIVE EDIT'23",
+          "AMARA | SPRING SUMMER '23 - THE FLORAL EDIT",
+          "GULBHAG| THE SUMMER EDIT",
+          "LITTLE DEASHA | THE KIDS EDIT",
+          "LEHENGAS",
+          "ANARKALIS",
+          "SAREES",
+          "SHARARA SETS",
+          "COORD SETS",
+          "FUSION WEAR",
+          "SUIT SETS",
+          "DRESSES",
+          "UNDER 3K",
+          "UNDER 5K",
+          "UNDER 10K",
+          "LITTLE DEASHA",
+          "SALE",
+          "CARNIVAL",
+          "HALDI HUES",
+          "MEHNDHI",
+          "DAYLIGHT PHERA",
+          "SANGEET NIGHT",
+          "UNDER 2K",
+          "SHORT KURTIS",
+          "Saris & Lehengas"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": [
+          {
+            "id": 50472020541751,
+            "title": "XS",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020574519,
+            "title": "XXS",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020607287,
+            "title": "S",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020640055,
+            "title": "M",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020672823,
+            "title": "L",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020705591,
+            "title": "XL",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020738359,
+            "title": "2XL",
+            "price": 4949.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020771127,
+            "title": "3XL",
+            "price": 5149.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020803895,
+            "title": "4XL",
+            "price": 5149.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020836663,
+            "title": "5XL",
+            "price": 5149.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 50472020869431,
+            "title": "6XL",
+            "price": 5149.0,
+            "discounted_price": 8999.0
+          }
+        ]
+      },
+      "source_url": "https://deashaindia.com/products/mahira-red-floral-saree",
+      "timestamp": "2025-09-07T19:03:09.428253"
+    },
+    {
+      "product_name": "URVIKA MAGENTA PINK RUFFLE SAREE",
+      "price": 3999.0,
+      "discounted_price": null,
+      "product_images": [
+        "https://deashaindia.com/cdn/shop/files/IMG_9351.jpg?v=1736421502&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_9345.jpg?v=1736421521&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_9333.jpg?v=1736421508&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_8986.jpg?v=1736421515&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_8969.jpg?v=1736421518&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_8952.jpg?v=1736421506&width=1946",
+        "https://deashaindia.com/cdn/shop/files/IMG_8943.jpg?v=1736421512&width=1946"
+      ],
+      "description": "The true beauty of this ensemble lies in its stylish ruffle detailing. The cascading ruffles add a modern and unique touch to the classic saree, creating a captivating and dynamic look. The saree is complemented with an elegant pallu featuring matching Fabric. The coordinating blouse adds sophistication and completes the harmonious look.FABRIC• Saree- Dyed Pure Georgette• Blouse - Dyed Pure GeorgettePRODUCT DETAILS• Neckline – V-shaped• Model Height – 5’6”• The model is wearing S size• Number of Pieces - 2• Detailing - Ruffles",
+      "sizes": [],
+      "colors": [],
+      "material": ". The coordinating blouse adds sophistication and completes the harmonious look.\n FABRIC\n• Saree- Dyed Pure Georgette\n• Blouse - Dyed Pure Georgette",
+      "metadata": {
+        "platform": "shopify",
+        "extracted_at": "2025-09-07T19:03:23.724468",
+        "availability": "InStock",
+        "sku": "",
+        "brand": "Deasha India",
+        "categories": [
+          "BANNO KE LIBAAS",
+          "HANDPAINTED HUES",
+          "ADAH",
+          "BEHR | THE LEHERIYA EDIT'24",
+          "SAJDA| THE WEDDING EDIT'24",
+          "AMORA'24 | THE VACATION EDIT",
+          "JASHN| THE FESTIVE EDIT'23",
+          "AMARA | SPRING SUMMER '23 - THE FLORAL EDIT",
+          "GULBHAG| THE SUMMER EDIT",
+          "LITTLE DEASHA | THE KIDS EDIT",
+          "LEHENGAS",
+          "ANARKALIS",
+          "SAREES",
+          "SHARARA SETS",
+          "COORD SETS",
+          "FUSION WEAR",
+          "SUIT SETS",
+          "DRESSES",
+          "UNDER 3K",
+          "UNDER 5K",
+          "UNDER 10K",
+          "LITTLE DEASHA",
+          "SALE",
+          "CARNIVAL",
+          "HALDI HUES",
+          "MEHNDHI",
+          "DAYLIGHT PHERA",
+          "SANGEET NIGHT",
+          "UNDER 2K",
+          "SHORT KURTIS",
+          "Saris & Lehengas"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": [
+          {
+            "id": 47522392441143,
+            "title": "XXS",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392637751,
+            "title": "XS",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392670519,
+            "title": "S",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392703287,
+            "title": "M",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392736055,
+            "title": "L",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392801591,
+            "title": "XL",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392834359,
+            "title": "XXL",
+            "price": 3999.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392867127,
+            "title": "XXXL",
+            "price": 4199.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392899895,
+            "title": "4XL",
+            "price": 4199.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392932663,
+            "title": "5XL",
+            "price": 4199.0,
+            "discounted_price": 8390.0
+          },
+          {
+            "id": 47522392965431,
+            "title": "6XL",
+            "price": 4199.0,
+            "discounted_price": 8390.0
+          }
+        ]
+      },
+      "source_url": "https://deashaindia.com/products/urvika-magenta-pink-ruffle-saree",
+      "timestamp": "2025-09-07T19:03:23.724468"
+    },
+    {
+      "product_name": "ANISAH LAVENDER FLORAL PRINTED RUFFLE SAREE WITH DRAPED BLOUSE",
+      "price": 4599.0,
+      "discounted_price": null,
+      "product_images": [
+        "https://deashaindia.com/cdn/shop/files/0P6A1681_1.jpg?v=1736419784&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1701_1.jpg?v=1736419799&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1675_1.jpg?v=1736419790&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1680_1.jpg?v=1736419792&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1688_1.jpg?v=1736419796&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1694.jpg?v=1736419781&width=1946",
+        "https://deashaindia.com/cdn/shop/files/0P6A1696_1.jpg?v=1736419786&width=1946"
+      ],
+      "description": "Elevate your style with this stunning lavender floral print Saree. Made of soft chiffon fabric, this saree is easy to carry and perfect to add some glam to any event. The trendy and playful frills on border and this unique draped blouse add a touch of feminity to this trendy piece.FABRIC• Saree - Chiffon• Blouse - Chiffon• Neckline – Draped- PlungePRODUCT DETAILS• Model Height – 5’6”• The model is wearing S size• Detailing - RuffledWASHING INSTRUCTIONDry Clean only. Please don't spray deodorant or perfumes directly on the fabric.DISCLAIMEROur products are photographed professionally under controlled lighting. Colours tend to be witnessed differently depending on various factors such as shot angles, lighting, background colours and warm/cold colours. As a result, prints and colours may vary 10-12%. Nevertheless, we try to match the tones as close to the original product colours as possible.CUSTOMIZATIONWe offer 'customization' in size, length, sleeve and necklines. Please refer to details under our customize tab",
+      "sizes": [],
+      "colors": [],
+      "material": ", this saree is easy to carry and perfect to add some glam to any event. The trendy and playful frills on border and this unique draped blouse add a touch of feminity to this trendy piece.\n FABRIC\n• S",
+      "metadata": {
+        "platform": "shopify",
+        "extracted_at": "2025-09-07T19:03:34.396883",
+        "availability": "InStock",
+        "sku": "",
+        "brand": "Deasha India",
+        "categories": [
+          "BANNO KE LIBAAS",
+          "HANDPAINTED HUES",
+          "ADAH",
+          "BEHR | THE LEHERIYA EDIT'24",
+          "SAJDA| THE WEDDING EDIT'24",
+          "AMORA'24 | THE VACATION EDIT",
+          "JASHN| THE FESTIVE EDIT'23",
+          "AMARA | SPRING SUMMER '23 - THE FLORAL EDIT",
+          "GULBHAG| THE SUMMER EDIT",
+          "LITTLE DEASHA | THE KIDS EDIT",
+          "LEHENGAS",
+          "ANARKALIS",
+          "SAREES",
+          "SHARARA SETS",
+          "COORD SETS",
+          "FUSION WEAR",
+          "SUIT SETS",
+          "DRESSES",
+          "UNDER 3K",
+          "UNDER 5K",
+          "UNDER 10K",
+          "LITTLE DEASHA",
+          "SALE",
+          "CARNIVAL",
+          "HALDI HUES",
+          "MEHNDHI",
+          "DAYLIGHT PHERA",
+          "SANGEET NIGHT",
+          "UNDER 2K",
+          "SHORT KURTIS",
+          "Apparel & Accessories"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": [
+          {
+            "id": 45464662311223,
+            "title": "XXS",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662343991,
+            "title": "XS",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45423101772087,
+            "title": "S",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45423101804855,
+            "title": "M",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45423101837623,
+            "title": "L",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45423101870391,
+            "title": "XL",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662376759,
+            "title": "XXL",
+            "price": 4599.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662409527,
+            "title": "3XL",
+            "price": 4799.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662442295,
+            "title": "4XL",
+            "price": 4799.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662475063,
+            "title": "5XL",
+            "price": 4799.0,
+            "discounted_price": 8999.0
+          },
+          {
+            "id": 45464662507831,
+            "title": "6XL",
+            "price": 4799.0,
+            "discounted_price": 8999.0
+          }
+        ]
+      },
+      "source_url": "https://deashaindia.com/products/anisah-lavender-floral-printed-ruffle-saree-with-draped-blouse",
+      "timestamp": "2025-09-07T19:03:34.396883"
+    }
+  ]
+}

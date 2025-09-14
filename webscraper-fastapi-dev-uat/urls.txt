@@ -1,0 +1,4 @@
+# Product URLs to scrape
+https://ajmerachandanichowk.com/product-category/lehenga/
+https://deashaindia.com/collections/sarees
+https://example.com/products/dress

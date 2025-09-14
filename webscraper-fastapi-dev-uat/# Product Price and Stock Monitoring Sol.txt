@@ -1,0 +1,701 @@
+# Product Price and Stock Monitoring Solution
+
+I'll create a comprehensive solution to monitor product prices and stock levels, then send this data to your API. Here's the complete implementation:
+
+## 1. Enhanced Product Scraper with Price/Stock Focus
+
+Create a new file `price_stock_monitor.py`:
+
+```python
+import asyncio
+import json
+import os
+import logging
+import aiohttp
+from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional
+from urllib.parse import urlparse
+import re
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("price_monitor.log"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class PriceStockMonitor:
+    def __init__(self, api_endpoint: str, api_key: str = None):
+        self.api_endpoint = api_endpoint
+        self.api_key = api_key
+        self.last_run_file = "last_price_check.txt"
+        self.price_history_file = "price_history.json"
+        
+    async def load_urls(self, urls_file: str = "product_urls.txt") -> List[str]:
+        """Load product URLs from a text file"""
+        try:
+            with open(urls_file, 'r') as f:
+                urls = [line.strip() for line in f if line.strip() and not line.startswith('#')]
+            logger.info(f"Loaded {len(urls)} product URLs from {urls_file}")
+            return urls
+        except FileNotFoundError:
+            logger.error(f"Product URLs file {urls_file} not found")
+            return []
+    
+    def should_run(self) -> bool:
+        """Check if it's time to run the monitor (every 10 days)"""
+        try:
+            if not os.path.exists(self.last_run_file):
+                return True
+                
+            with open(self.last_run_file, 'r') as f:
+                last_run_str = f.read().strip()
+                
+            if not last_run_str:
+                return True
+                
+            last_run = datetime.fromisoformat(last_run_str)
+            next_run = last_run + timedelta(days=10)
+            
+            if datetime.now() >= next_run:
+                return True
+            else:
+                logger.info(f"Next price check scheduled for: {next_run}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error checking last run: {e}")
+            return True
+    
+    def update_last_run(self):
+        """Update the last run timestamp"""
+        try:
+            with open(self.last_run_file, 'w') as f:
+                f.write(datetime.now().isoformat())
+            logger.info("Updated last price check timestamp")
+        except Exception as e:
+            logger.error(f"Error updating last run: {e}")
+    
+    def load_price_history(self):
+        """Load price history from file"""
+        try:
+            if os.path.exists(self.price_history_file):
+                with open(self.price_history_file, 'r') as f:
+                    return json.load(f)
+            return {}
+        except Exception as e:
+            logger.error(f"Error loading price history: {e}")
+            return {}
+    
+    def save_price_history(self, history):
+        """Save price history to file"""
+        try:
+            with open(self.price_history_file, 'w') as f:
+                json.dump(history, f, indent=2)
+        except Exception as e:
+            logger.error(f"Error saving price history: {e}")
+    
+    async def extract_product_details(self, url: str) -> Optional[Dict[str, Any]]:
+        """Extract product details including price and stock status"""
+        try:
+            # Use Playwright to fetch page content
+            from playwright.async_api import async_playwright
+            
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                # Set realistic headers to avoid blocking
+                await page.set_extra_http_headers({
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive',
+                    'Upgrade-Insecure-Requests': '1',
+                })
+                
+                await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                
+                # Wait for product details to load
+                await page.wait_for_timeout(2000)
+                
+                # Extract page content
+                content = await page.content()
+                await browser.close()
+                
+                # Parse with BeautifulSoup
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(content, 'html.parser')
+                
+                # Extract product details
+                product_data = await self.parse_product_page(soup, url)
+                return product_data
+                
+        except Exception as e:
+            logger.error(f"Error extracting product details from {url}: {e}")
+            return None
+    
+    async def parse_product_page(self, soup, url: str) -> Dict[str, Any]:
+        """Parse product page to extract price and stock information"""
+        product_data = {
+            "url": url,
+            "timestamp": datetime.now().isoformat(),
+            "name": self.extract_product_name(soup),
+            "price": self.extract_price(soup),
+            "original_price": self.extract_original_price(soup),
+            "currency": self.extract_currency(soup, url),
+            "stock_status": self.extract_stock_status(soup),
+            "stock_quantity": self.extract_stock_quantity(soup),
+            "sku": self.extract_sku(soup),
+            "brand": self.extract_brand(soup, url),
+            "categories": self.extract_categories(soup),
+            "image_url": self.extract_image_url(soup, url),
+            "variants": self.extract_variants(soup),
+        }
+        
+        return product_data
+    
+    def extract_product_name(self, soup) -> str:
+        """Extract product name"""
+        selectors = [
+            'h1.product-title',
+            'h1.product__title',
+            'h1[data-testid="product-title"]',
+            '.product-single__title',
+            '.product__title',
+            'h1.ProductItem-details-title',
+            'h1.entry-title',
+            'h1.product_title',
+            'h1',
+            '.product-title',
+            '[data-product-title]'
+        ]
+        
+        for selector in selectors:
+            element = soup.select_one(selector)
+            if element:
+                return element.get_text(strip=True)
+        
+        # Fallback to title tag
+        title_tag = soup.find('title')
+        if title_tag:
+            return title_tag.get_text(strip=True).split('|')[0].strip()
+        
+        return "Unknown Product"
+    
+    def extract_price(self, soup) -> float:
+        """Extract current price"""
+        price_selectors = [
+            '.price__current .money',
+            '.product-price .money',
+            '.price-current',
+            '.current-price',
+            '.price .money',
+            '.price-item--regular',
+            '.price__regular .price-item',
+            '.price__regular',
+            '.price-item',
+            '.woocommerce-Price-amount',
+            '.price ins .woocommerce-Price-amount',
+            '.price .amount',
+            'p.price',
+            '.price',
+            '[data-price]',
+            '.ProductItem-details-checkout-price'
+        ]
+        
+        for selector in price_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                price_text = element.get_text(strip=True)
+                price = self.parse_price_text(price_text)
+                if price > 0:
+                    return price
+        
+        return 0.0
+    
+    def extract_original_price(self, soup) -> float:
+        """Extract original price (if on sale)"""
+        compare_selectors = [
+            '.price__compare .money',
+            '.compare-price',
+            '.was-price',
+            '.price-compare',
+            '.price del .woocommerce-Price-amount',
+            '.price del .amount',
+            '[data-compare-price]',
+            '.price-item--sale'
+        ]
+        
+        for selector in compare_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                price_text = element.get_text(strip=True)
+                price = self.parse_price_text(price_text)
+                if price > 0:
+                    return price
+        
+        return 0.0
+    
+    def parse_price_text(self, text: str) -> float:
+        """Parse price text into a float value"""
+        if not text:
+            return 0.0
+        
+        # Extract numbers with decimal points or commas
+        numbers = re.findall(r'\d+[,.]?\d*', text)
+        
+        for num in numbers:
+            # Clean and convert to float
+            cleaned = num.replace(',', '')
+            try:
+                price = float(cleaned)
+                if price > 0:
+                    return price
+            except:
+                continue
+        
+        return 0.0
+    
+    def extract_currency(self, soup, url: str) -> str:
+        """Extract currency information"""
+        # Check for currency symbols in price elements
+        price_elements = soup.select('.price, .money, [data-price]')
+        for element in price_elements:
+            text = element.get_text()
+            if '₹' in text:
+                return 'INR'
+            elif '$' in text:
+                return 'USD'
+            elif '€' in text:
+                return 'EUR'
+            elif '£' in text:
+                return 'GBP'
+        
+        # Guess based on domain
+        domain = urlparse(url).netloc.lower()
+        if '.in' in domain or 'india' in domain:
+            return 'INR'
+        elif '.com' in domain:
+            return 'USD'
+        
+        return 'USD'  # Default
+    
+    def extract_stock_status(self, soup) -> str:
+        """Extract stock status"""
+        # Look for stock indicators
+        stock_indicators = soup.find_all(text=re.compile(
+            r'(in stock|out of stock|sold out|available|unavailable|pre-order|backorder)',
+            re.IGNORECASE
+        ))
+        
+        for indicator in stock_indicators:
+            text = indicator.strip().lower()
+            if 'out of stock' in text or 'sold out' in text or 'unavailable' in text:
+                return 'out_of_stock'
+            elif 'in stock' in text or 'available' in text:
+                return 'in_stock'
+            elif 'pre-order' in text:
+                return 'pre_order'
+            elif 'backorder' in text:
+                return 'backorder'
+        
+        # Check for add to cart button
+        add_to_cart = soup.select('button[type="submit"], input[type="submit"], .add-to-cart')
+        if add_to_cart:
+            return 'in_stock'
+        
+        return 'unknown'
+    
+    def extract_stock_quantity(self, soup) -> int:
+        """Extract stock quantity if available"""
+        # Look for quantity inputs or stock messages
+        quantity_selectors = [
+            'input[name="quantity"]',
+            '.quantity input',
+            '.stock-quantity',
+            '[data-stock]',
+            '.inventory-quantity'
+        ]
+        
+        for selector in quantity_selectors:
+            element = soup.select_one(selector)
+            if element:
+                if element.get('value'):
+                    try:
+                        return int(element.get('value'))
+                    except:
+                        pass
+                if element.get('data-stock'):
+                    try:
+                        return int(element.get('data-stock'))
+                    except:
+                        pass
+        
+        # Try to parse from text
+        stock_text = soup.find_all(text=re.compile(r'\d+ in stock', re.IGNORECASE))
+        for text in stock_text:
+            numbers = re.findall(r'\d+', text)
+            if numbers:
+                try:
+                    return int(numbers[0])
+                except:
+                    pass
+        
+        return 0
+    
+    def extract_sku(self, soup) -> str:
+        """Extract product SKU"""
+        sku_selectors = [
+            '.sku',
+            '[data-sku]',
+            '.product-sku',
+            'meta[itemprop="sku"]'
+        ]
+        
+        for selector in sku_selectors:
+            element = soup.select_one(selector)
+            if element:
+                if element.get('content'):
+                    return element.get('content')
+                return element.get_text(strip=True)
+        
+        return ""
+    
+    def extract_brand(self, soup, url: str) -> str:
+        """Extract brand name"""
+        brand_selectors = [
+            '.brand',
+            '[data-brand]',
+            '.product-brand',
+            'meta[itemprop="brand"]'
+        ]
+        
+        for selector in brand_selectors:
+            element = soup.select_one(selector)
+            if element:
+                if element.get('content'):
+                    return element.get('content')
+                return element.get_text(strip=True)
+        
+        # Extract from URL as fallback
+        domain = urlparse(url).netloc
+        return domain.split('.')[-2].title() if '.' in domain else "Unknown"
+    
+    def extract_categories(self, soup) -> List[str]:
+        """Extract product categories"""
+        categories = []
+        
+        # Breadcrumb selectors
+        breadcrumb_selectors = [
+            '.breadcrumb a',
+            '.breadcrumbs a', 
+            '.breadcrumb-item a',
+            '.woocommerce-breadcrumb a',
+            'nav.breadcrumb a',
+            '.breadcrumb-trail a',
+            '.breadcrumbs__list a',
+            'nav[aria-label="breadcrumb"] a',
+        ]
+        
+        for selector in breadcrumb_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                text = element.get_text(strip=True)
+                if text and text.lower() not in ['home', 'products', 'shop', 'all']:
+                    categories.append(text)
+        
+        return categories
+    
+    def extract_image_url(self, soup, base_url: str) -> str:
+        """Extract primary product image URL"""
+        image_selectors = [
+            '.product__media img',
+            '.product-single__photos img',
+            '.ProductItem-gallery img',
+            '.product-photos img',
+            '.product-images img',
+            '.product-media img',
+            '.product__photo img',
+            '.woocommerce-product-gallery img',
+            '.product-images img',
+            '.wp-post-image',
+            '[data-product-image] img',
+            '.product-gallery img'
+        ]
+        
+        for selector in image_selectors:
+            element = soup.select_one(selector)
+            if element:
+                src = element.get('src') or element.get('data-src') or element.get('data-lazy-src')
+                if src:
+                    # Convert relative URLs to absolute
+                    if src.startswith('//'):
+                        src = 'https:' + src
+                    elif src.startswith('/'):
+                        src = urljoin(base_url, src)
+                    
+                    if src.startswith('http'):
+                        return src
+        
+        return ""
+    
+    def extract_variants(self, soup) -> List[Dict[str, Any]]:
+        """Extract product variants with prices and stock"""
+        variants = []
+        
+        # Look for variant options
+        variant_selectors = [
+            '.variant-input-wrap input',
+            '.product-form__option input',
+            '.variations input',
+            '.swatch input',
+            '.product-options input'
+        ]
+        
+        for selector in variant_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                if element.get('type') in ['radio', 'checkbox']:
+                    variant = {
+                        "name": element.get('name', ''),
+                        "value": element.get('value', ''),
+                        "price": self.parse_price_text(element.get('data-price', '')),
+                        "in_stock": not element.get('disabled') and not element.get('readonly')
+                    }
+                    variants.append(variant)
+        
+        return variants
+    
+    async def monitor_products(self, urls: List[str]) -> List[Dict[str, Any]]:
+        """Monitor all products and return their current details"""
+        product_details = []
+        
+        for i, url in enumerate(urls):
+            logger.info(f"Monitoring product {i+1}/{len(urls)}: {url}")
+            
+            details = await self.extract_product_details(url)
+            if details:
+                product_details.append(details)
+            
+            # Add delay between requests
+            await asyncio.sleep(1)
+        
+        return product_details
+    
+    async def send_to_api(self, data: List[Dict[str, Any]]) -> bool:
+        """Send product details to the API endpoint"""
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "User-Agent": "PriceStockMonitor/1.0"
+            }
+            
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
+            
+            payload = {
+                "timestamp": datetime.now().isoformat(),
+                "products": data,
+                "total_products": len(data)
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    self.api_endpoint,
+                    json=payload,
+                    headers=headers,
+                    timeout=60
+                ) as response:
+                    if response.status in [200, 201]:
+                        logger.info(f"Successfully sent {len(data)} product details to API")
+                        return True
+                    else:
+                        logger.error(f"API returned error status: {response.status}")
+                        return False
+        except Exception as e:
+            logger.error(f"Error sending data to API: {e}")
+            return False
+    
+    async def run(self):
+        """Main method to run the price and stock monitoring"""
+        if not self.should_run():
+            logger.info("Not time to run price check yet")
+            return
+        
+        logger.info("Starting price and stock monitoring")
+        
+        # Load URLs
+        urls = await self.load_urls()
+        if not urls:
+            logger.error("No product URLs to monitor")
+            return
+        
+        # Monitor products
+        product_details = await self.monitor_products(urls)
+        
+        if not product_details:
+            logger.error("No product details could be extracted")
+            return
+        
+        # Send to API
+        success = await self.send_to_api(product_details)
+        
+        if success:
+            # Update last run time
+            self.update_last_run()
+            
+            # Update price history
+            history = self.load_price_history()
+            for product in product_details:
+                url = product["url"]
+                if url not in history:
+                    history[url] = []
+                
+                history[url].append({
+                    "timestamp": product["timestamp"],
+                    "price": product["price"],
+                    "stock_status": product["stock_status"]
+                })
+            
+            self.save_price_history(history)
+            logger.info("Price and stock monitoring completed successfully")
+        else:
+            logger.error("Price and stock monitoring failed - API call unsuccessful")
+
+async def main():
+    # Configuration - update these values as needed
+    API_ENDPOINT = os.getenv("PRICE_API_ENDPOINT", "https://your-api-endpoint.com/price-updates")
+    API_KEY = os.getenv("API_KEY", None)
+    
+    monitor = PriceStockMonitor(API_ENDPOINT, API_KEY)
+    await monitor.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## 2. Create Product URLs File
+
+Create a file named `product_urls.txt` with your product URLs:
+
+```
+# Product URLs to monitor for price and stock
+https://ajmerachandanichowk.com/product/red-silk-lehenga/
+https://ajmerachandanichowk.com/product/blue-georgette-saree/
+https://deashaindia.com/products/designer-saree
+https://deashaindia.com/products/bridal-lehenga
+# Add more product URLs as needed
+```
+
+## 3. Create a Requirements File
+
+Create or update `requirements.txt`:
+
+```
+playwright==1.39.0
+beautifulsoup4==4.12.2
+aiohttp==3.9.1
+```
+
+## 4. Setup Instructions
+
+1. **Install dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   playwright install
+   ```
+
+2. **Set up environment variables**:
+   Create a `.env` file:
+   ```
+   PRICE_API_ENDPOINT=https://your-api-endpoint.com/price-updates
+   API_KEY=your_api_key_here
+   ```
+
+3. **Run the monitor manually first**:
+   ```bash
+   python price_stock_monitor.py
+   ```
+
+## 5. Schedule to Run Every 10 Days
+
+### On Linux/macOS (using cron):
+
+```bash
+# Open crontab editor
+crontab -e
+
+# Add this line to run every 10 days at 2 AM
+0 2 */10 * * cd /path/to/your/project && /path/to/python /path/to/project/price_stock_monitor.py >> /path/to/project/price_monitor.log 2>&1
+```
+
+### On Windows (using Task Scheduler):
+
+1. Open Task Scheduler
+2. Create a new task
+3. Set the trigger to "Daily" and recurrence to 10 days
+4. Set the action to start a program:
+   - Program: `C:\Path\To\Python\python.exe`
+   - Arguments: `C:\Path\To\Project\price_stock_monitor.py`
+5. Set the working directory to your project folder
+
+## 6. API Data Format
+
+The monitor will send data to your API in this format:
+
+```json
+{
+  "timestamp": "2023-11-07T12:00:00.000000",
+  "products": [
+    {
+      "url": "https://example.com/product/red-dress",
+      "timestamp": "2023-11-07T12:00:00.000000",
+      "name": "Red Silk Dress",
+      "price": 99.99,
+      "original_price": 129.99,
+      "currency": "USD",
+      "stock_status": "in_stock",
+      "stock_quantity": 15,
+      "sku": "RD123",
+      "brand": "Example Brand",
+      "categories": ["Dresses", "Women"],
+      "image_url": "https://example.com/images/red-dress.jpg",
+      "variants": [
+        {
+          "name": "size",
+          "value": "M",
+          "price": 99.99,
+          "in_stock": true
+        }
+      ]
+    }
+  ],
+  "total_products": 1
+}
+```
+
+## 7. Additional Features
+
+This solution includes:
+
+1. **Price History Tracking**: Saves historical price data to detect price changes
+2. **Stock Monitoring**: Tracks stock status and quantity
+3. **Variant Support**: Handles products with different variants (sizes, colors)
+4. **Currency Detection**: Automatically detects currency based on page content
+5. **Robust Error Handling**: Continues monitoring even if some products fail
+6. **Rate Limiting**: Adds delays between requests to avoid being blocked
+
+## 8. Monitoring and Logs
+
+The script will create:
+- `price_monitor.log` - Detailed logs of each run
+- `last_price_check.txt` - Timestamp of the last successful run
+- `price_history.json` - Historical price and stock data for all products
+
+This solution provides a comprehensive price and stock monitoring system that will run every 10 days, extract detailed product information, and send it to your API endpoint. The data includes current prices, stock status, product details, and variant information.

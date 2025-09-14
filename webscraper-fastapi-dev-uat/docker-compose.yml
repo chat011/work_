@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  ai-scraper:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - HOST=0.0.0.0
+      - PORT=8000
+      - LOG_LEVEL=INFO
+      - MAX_CONCURRENT_TASKS=5
+    volumes:
+      - ./logs:/app/logs
+      - /dev/shm:/dev/shm  # Shared memory for Chrome
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 

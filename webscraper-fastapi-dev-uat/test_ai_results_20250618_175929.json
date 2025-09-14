@@ -1,0 +1,260 @@
+{
+  "metadata": {
+    "timestamp": "20250618_175929",
+    "total_products": 9,
+    "total_pages_processed": 2,
+    "scraper_type": "ai_agent_gemini",
+    "ai_stats": {
+      "pages_analyzed": 2,
+      "products_found": 9,
+      "pagination_pages_discovered": 3,
+      "ai_extraction_success": 9,
+      "ai_extraction_failures": 0,
+      "fallback_extractions": 0
+    },
+    "urls_processed": 2
+  },
+  "products": [
+    {
+      "product_name": "Beautiful Amazing Paithani Saree",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Sarees"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/beautiful-amazing-paithani-saree/",
+      "timestamp": "2025-06-18T17:56:58.115091",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "BLUE FLORAL FUSION SAREE",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Sarees"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/blue-floral-fusion-saree/",
+      "timestamp": "2025-06-18T17:57:06.129973",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "CHARULATA FLORAL DRAPED SAREE",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Sarees"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/charulata-floral-draped-saree/",
+      "timestamp": "2025-06-18T17:57:14.143470",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "Elegant Gray Designer Gown for Women",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [
+        "Gray"
+      ],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Dresses"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/elegant-gray-designer-gown-for-women/",
+      "timestamp": "2025-06-18T17:57:23.041672",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "MINT KIWI COTTON TIER DRESS",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [
+        "Mint",
+        "Kiwi"
+      ],
+      "material": "Cotton",
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Dresses"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/mint-kiwi-cotton-tier-dress/",
+      "timestamp": "2025-06-18T17:58:15.378051",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "PURPLE EMBRIDERED LEHENGA SET",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [
+        "Purple"
+      ],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Lehenga"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/purple-embridered-lehenga-set/",
+      "timestamp": "2025-06-18T17:58:23.467418",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "SKYLIGHT PLEATS COTTON DRESS",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": "Cotton",
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Dresses"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/skylight-pleats-cotton-dress/",
+      "timestamp": "2025-06-18T17:58:33.092932",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "SUMMER BREEZE COTTON DRESS",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": "Cotton",
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Dresses"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/summer-breeze-cotton-dress/",
+      "timestamp": "2025-06-18T17:58:45.587762",
+      "extraction_method": "ai_agent"
+    },
+    {
+      "product_name": "Variation Product Filter",
+      "price": null,
+      "discounted_price": null,
+      "product_images": [],
+      "description": null,
+      "sizes": [],
+      "colors": [],
+      "material": null,
+      "metadata": {
+        "availability": "InStock",
+        "sku": null,
+        "brand": null,
+        "categories": [
+          "Sarees"
+        ],
+        "tags": [],
+        "rating": null,
+        "review_count": null,
+        "specifications": {},
+        "variants": []
+      },
+      "source_url": "https://ajmerachandanichowk.com/product/hello/",
+      "timestamp": "2025-06-18T17:58:55.211819",
+      "extraction_method": "ai_agent"
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+# Production Dockerfile for AI-Powered Web Scraper API
+# Optimized for Python 3.11 and production deployment
+
+# Use Python 3.11 slim image for smaller size
+FROM python:3.11-slim-bullseye
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    # Build dependencies
+    build-essential \
+    curl \
+    wget \
+    git \
+    # Playwright dependencies
+    libnss3-dev \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libxss1 \
+    libasound2 \
+    libatspi2.0-0 \
+    libgtk-3-0 \
+    # Additional dependencies
+    libssl-dev \
+    libffi-dev \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /tmp/* \
+    && rm -rf /var/tmp/*
+
+# Create non-root user
+RUN groupadd -r scraper && useradd -r -g scraper scraper
+
+# Copy requirements first for better caching
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements.txt && \
+    # Install Playwright browsers
+    playwright install chromium && \
+    playwright install-deps chromium && \
+    # Clean up
+    pip cache purge
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p logs templates static && \
+    chown -R scraper:scraper /app
+
+# Switch to non-root user
+USER scraper
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Default command
+CMD ["gunicorn", "api:app", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--log-level", "info", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--preload", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "100", \
+     "--timeout", "300", \
+     "--keep-alive", "2"] 

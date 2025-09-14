@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "timestamp": "20250618_183702",
+    "total_products": 0,
+    "total_pages_processed": 0,
+    "scraper_type": "ai_agent_gemini",
+    "ai_stats": {
+      "pages_analyzed": 1,
+      "products_found": 0,
+      "pagination_pages_discovered": 0,
+      "ai_extraction_success": 0,
+      "ai_extraction_failures": 16,
+      "fallback_extractions": 16
+    },
+    "urls_processed": 1
+  },
+  "products": []
+}
