@@ -1502,6 +1502,10 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
             color: #333;
             word-break: break-all;
         }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
 
@@ -1549,10 +1553,72 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
             </div>
 
             <div>
-                <div class="input-section">
+                <div class="settings-panel">
+                    <input id="showDomain" name="choice" type="radio" value="domain" /> Domain Extraction &nbsp;&nbsp;
+                    <input id="showProducts" name="choice" type="radio" value="product" /> Product Extraction
+                </div>
+
+                <div id="inputSectionurl">
+                    <div class="input-section">
+                        <div class="url-input-container">
+                            <textarea id="domainurlInput" class="url-input"
+                                placeholder="Enter e-commerce URLs (one per line)&#10;&#10;Examples:&#10;https://deashaindia.com/collections/sarees&#10;https://example-store.com/products/dress&#10;https://shop.example.com/category/accessories"></textarea>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="btn btn-secondary" id="clearBtn">
+                                🗑️ Clear
+                            </button>
+                            <button class="btn btn-secondary" id="activeTasksBtn" style="display: none;">
+                                <span id="activeTasksCount">0</span> Active Tasks
+                            </button>
+                            <button class="btn btn-primary" id="scrapeDomain">
+                                🚀 Grab SubDomain
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="container">
+                        <div class="card">
+                            <h1>Product URL List</h1>
+                            <div class="controls">
+                                <div class="perpage">Showing <span id="range">1 - 10</span> of <strong
+                                        id="total"></strong>
+                                    URLs
+                                </div>
+                                <div>
+                                    <label for="perPage">Per page: </label>
+                                    <select id="perPageSelect">
+                                        <option value="5">5</option>
+                                        <option value="10" selected>10</option>
+                                        <option value="20">20</option>
+                                    </select>
+                                </div>
+                            </div>
+
+
+                            <div class="list" id="domainList"></div>
+
+
+                            <div class="pagination" id="pagination"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-messages" id="chatMessages">
+                    <div class="empty-state">
+                        <h3>Ready to Scrape Fashion Products</h3>
+                        <p>Enter one or more e-commerce URLs below to start extracting product data with AI
+                            intelligence.
+                        </p>
+                        <p><strong>Supported:</strong> Shopify, WooCommerce, and custom e-commerce sites</p>
+                    </div>
+                </div>
+
+
+                <div class="input-section" id="inputSectionScrape">
                     <div class="url-input-container">
-                        <textarea id="domainurlInput" class="url-input"
-                            placeholder="Enter e-commerce URLs (one per line)&#10;&#10;Examples:&#10;https://deashaindia.com&#10;https://example-store.com"></textarea>
+                        <textarea id="urlInput" class="url-input"
+                            placeholder="Enter e-commerce URLs (one per line)&#10;&#10;Examples:&#10;https://deashaindia.com/collections/sarees&#10;https://example-store.com/products/dress&#10;https://shop.example.com/category/accessories"></textarea>
                     </div>
                     <div class="action-buttons">
                         <button class="btn btn-secondary" id="clearBtn">
@@ -1561,64 +1627,12 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                         <button class="btn btn-secondary" id="activeTasksBtn" style="display: none;">
                             <span id="activeTasksCount">0</span> Active Tasks
                         </button>
-                        <button class="btn btn-primary" id="scrapeDomain">
-                            🚀 Grab SubDomain
+                        <button class="btn btn-primary" id="scrapeBtn">
+                            🚀 Grab Products
                         </button>
                     </div>
                 </div>
 
-                <div class="container">
-                    <div class="card">
-                        <h1>Product URL List</h1>
-                        <div class="controls">
-                            <div class="perpage">Showing <span id="range">1 - 10</span> of <strong id="total"></strong>
-                                URLs
-                            </div>
-                            <div>
-                                <label for="perPage">Per page: </label>
-                                <select id="perPageSelect">
-                                    <option value="5">5</option>
-                                    <option value="10" selected>10</option>
-                                    <option value="20">20</option>
-                                </select>
-                            </div>
-                        </div>
-
-
-                        <div class="list" id="domainList"></div>
-
-
-                        <div class="pagination" id="pagination"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="chat-messages" id="chatMessages">
-                <div class="empty-state">
-                    <h3>Ready to Scrape Fashion Products</h3>
-                    <p>Enter one or more e-commerce URLs below to start extracting product data with AI intelligence.
-                    </p>
-                    <p><strong>Supported:</strong> Shopify, WooCommerce, and custom e-commerce sites</p>
-                </div>
-            </div>
-
-
-            <div class="input-section">
-                <div class="url-input-container">
-                    <textarea id="urlInput" class="url-input"
-                        placeholder="Enter e-commerce URLs (one per line)&#10;&#10;Examples:&#10;https://deashaindia.com/collections/sarees&#10;https://example-store.com/products/dress&#10;https://shop.example.com/category/accessories"></textarea>
-                </div>
-                <div class="action-buttons">
-                    <button class="btn btn-secondary" id="clearBtn">
-                        🗑️ Clear
-                    </button>
-                    <button class="btn btn-secondary" id="activeTasksBtn" style="display: none;">
-                        <span id="activeTasksCount">0</span> Active Tasks
-                    </button>
-                    <button class="btn btn-primary" id="scrapeBtn">
-                        🚀 Grab Products
-                    </button>
-                </div>
             </div>
         </div>
     </div>
@@ -1667,6 +1681,15 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                 this.maxPages = document.getElementById('maxPages');
                 this.aiPagination = document.getElementById('aiPagination');
                 this.aiExtraction = document.getElementById('aiExtraction');
+                this.showDomain = document.getElementById('showDomain');
+                this.showProducts = document.getElementById('showProducts');
+
+                this.inputSectionurl = document.getElementById('inputSectionurl');
+                this.inputSectionScrape = document.getElementById('inputSectionScrape');
+
+                this.showDomain.checked = true;
+                this.showProducts.checked = false;
+                this.inputSectionScrape.classList.add('hidden');
             }
 
             bindEvents() {
@@ -1674,6 +1697,21 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                 // this.scrapeBtnDomain.addEventListener('click', () => this.getDomainUrls());
                 this.clearBtn.addEventListener('click', () => this.clearAll());
                 this.activeTasksBtn.addEventListener('click', () => this.showActiveTasksModal());
+                this.showDomain.addEventListener('change', () => {
+                    if (this.showDomain.checked) {
+                        // this.showProducts.checked = true;
+                        this.inputSectionurl.classList.remove('hidden');
+                        this.inputSectionScrape.classList.add('hidden');
+                    } 
+                });
+                this.showProducts.addEventListener('change', () => {
+                    if (this.showProducts.checked) {
+                        // this.showDomain.checked = false;
+                        this.inputSectionScrape.classList.remove('hidden');
+                         this.inputSectionurl.classList.add('hidden');
+                    }
+                });
+                
 
                 this.urlInput.addEventListener('keydown', (e) => {
                     if (e.ctrlKey && e.key === 'Enter') {
@@ -1698,6 +1736,17 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                     this.updateActiveTasksDisplay();
                 }, 10000);
             }
+
+ handleSelection() {
+    console.log(this.showDomain);
+      if (this.showDomain.checked) {
+        this.inputSectionurl.classList.remove("hidden");
+        // this.inputSectionScrape.classList.add("hidden");
+      } else if (this.showProducts.checked) {
+        // this.inputSectionurl.classList.remove("hidden");
+        this.inputSectionScrape.classList.add("hidden");
+      }
+    }
 
             async updateActiveTasksDisplay() {
                 try {
@@ -2354,6 +2403,7 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
 
 
             async getDomainUrls() {
+                const button = document.getElementById("scrapeDomain");
                 try {
                     const domainurlInput = document.getElementById("domainurlInput");
                     const domainurl = domainurlInput.value.trim();
@@ -2361,6 +2411,9 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                         alert("Please enter a domain URL.");
                         return;
                     }
+
+                    button.disabled = true;
+                    button.innerHTML = "⏳ Loading...";
 
                     console.log("Fetching domain URLs for:", domainurl);
 
@@ -2373,7 +2426,7 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                     if (response.ok) {
                         const data = await response.json();
                         console.log("Domain URLs fetched:", data);
-                        this.urls = data.sublinks || [];
+                        this.urls = data.collections_with_products || [];
                         this.currentPage = 1;
                         this.render();
                     } else {
@@ -2381,6 +2434,10 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;line-height:1.4;backgroun
                     }
                 } catch (error) {
                     console.error("Error fetching domain URLs:", error);
+                } finally {
+                    // Reset button state
+                    button.disabled = false;
+                    button.innerHTML = "🚀 Grab SubDomain";
                 }
             }
 

@@ -28,6 +28,10 @@ import concurrent.futures
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+import httpx
+from selectolax.parser import HTMLParser
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -601,13 +605,15 @@ async def get_products_by_task_id(task_id: str):
     except Exception as e:
         logger.error(f"Error retrieving products for task {task_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error retrieving products: {str(e)}")
+
 class UploadProductsRequest(BaseModel):
+    """Model for upload products request"""
     products: List[Dict[str, Any]]
     metadata: Optional[Dict[str, Any]] = None
 
 @app.post("/api/upload-products")
 async def upload_products(request: UploadProductsRequest):
-    """Upload edited products with options from external API"""
+    """Upload edited products"""
     try:
         products = request.products
         metadata = request.metadata or {}
@@ -1149,37 +1155,74 @@ class UrlRequest(BaseModel):
 
 @app.post("/api/get-domain-urls")
 async def get_domain_urls(req: UrlRequest):
-    """Get all sublinks from given domain"""
     try:
         base_url = req.base_url.strip()
-        
-        # Send request
-        response = requests.get(base_url, timeout=10)
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Unable to fetch the website")
-        
-        soup = BeautifulSoup(response.text, "lxml")
+        if not base_url.startswith(("http://", "https://")):
+            base_url = "https://" + base_url
 
-        # Collect sublinks
-        sublinks = set()
-        for link in soup.find_all("a", href=True):
-            href = link["href"]
-            full_url = urljoin(base_url, href)
+        headers = {"User-Agent": "Mozilla/5.0"}
 
-            # Keep only same-domain links
-            if urlparse(full_url).netloc == urlparse(base_url).netloc:
-                sublinks.add(full_url)
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(10.0, connect=5.0),
+            verify=False,
+            follow_redirects=True,
+            headers=headers
+        ) as client:
+            resp = await client.get(base_url)
+            
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
 
-        return {
-            "success": True,
-            "base_url": base_url,
-            "sublinks_count": len(sublinks),
-            "sublinks": sorted(list(sublinks))
-        }
-    
+            tree = HTMLParser(resp.text)
+            sublinks = set()
+            for a in tree.css("a[href]"):
+                href = a.attributes.get("href")
+                if not href:
+                    continue
+                full_url = urljoin(base_url, href)
+                if urlparse(full_url).netloc == urlparse(base_url).netloc:
+                    sublinks.add(full_url)
+
+            sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
+
+            semaphore = asyncio.Semaphore(5)
+            async def fetch(url):
+                async with semaphore:
+                    try:
+                        return url, await client.get(url)
+                    except Exception:
+                        return url, None
+
+            responses = await asyncio.gather(*[fetch(u) for u in sublinks])
+
+            collections_with_products, product_urls, urls_array = [], set(), set()
+            for url, res in responses:
+                if not res or res.status_code != 200:
+                    continue
+                tree = HTMLParser(res.text)
+                product_links = [
+                    urljoin(base_url, a.attributes.get("href"))
+                    for a in tree.css("a[href*='/products/']")
+                ]
+                if product_links:
+                    collections_with_products.append(url)
+                    product_urls.update(product_links)
+                urls_array.add(url)
+
+            return {
+                "success": True,
+                "base_url": base_url,
+                "collections_count": len(collections_with_products),
+                "collections_with_products": sorted(collections_with_products),
+                "total_products": len(product_urls),
+                "all_product_urls": sorted(product_urls),
+                "urls_array": sorted(urls_array)
+            }
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error scraping domain: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
 
+    
 async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30):
     """Clean up terminated tasks from memory after a delay"""
     try:
