@@ -7,7 +7,7 @@ Tests the enhanced dynamic selector generation and website-specific scraping
 import asyncio
 import json
 from datetime import datetime
-from scraper_ai_agent import scrape_urls_ai_agent
+from scraper_ai_agent_deep import scrape_urls_ai_agent
 
 def progress_callback(progress_data):
     """Handle progress updates"""

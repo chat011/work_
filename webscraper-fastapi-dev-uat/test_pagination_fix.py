@@ -17,7 +17,7 @@ async def test_pagination_fix():
     
     # Import here to avoid import issues
     try:
-        from scraper_ai_agent import scrape_urls_ai_agent
+        from scraper_ai_agent_deep import scrape_urls_ai_agent
     except ImportError as e:
         print(f"Import error: {e}")
         print("Make sure all dependencies are installed")

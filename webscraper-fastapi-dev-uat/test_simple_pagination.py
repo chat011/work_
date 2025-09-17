@@ -4,7 +4,7 @@ Simple test to debug pagination detection
 """
 
 import asyncio
-from scraper_ai_agent import GeminiAIAgent, AIProductScraper
+from scraper_ai_agent_deep import GeminiAIAgent, AIProductScraper
 from playwright.async_api import async_playwright
 
 async def test_single_url_pagination():

@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime
-from scraper_ai_agent import scrape_urls_ai_agent
+from scraper_ai_agent_deep import scrape_urls_ai_agent
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)

@@ -5,8 +5,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 import aiohttp
-from scraper_simple import SimpleProductScraper
-from scraper_ai_agent import AIProductScraper
+from scraper_simple_deep import SimpleProductScraper
+from scraper_ai_agent_deep import AIProductScraper
 from image_url_fixer import fix_product_images
 
 # Configure logging

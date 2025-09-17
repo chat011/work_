@@ -48,6 +48,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static", StaticFiles(directory="./static/"), name="static")
+
 # Setup templates
 templates = Jinja2Templates(directory="templates")
 
@@ -610,17 +612,22 @@ class UploadProductsRequest(BaseModel):
     """Model for upload products request"""
     products: List[Dict[str, Any]]
     metadata: Optional[Dict[str, Any]] = None
+    send_to_external: bool = False  # Add this field
 
 @app.post("/api/upload-products")
 async def upload_products(request: UploadProductsRequest):
-    """Upload edited products"""
+    """Upload edited products and optionally send to external API"""
     try:
         products = request.products
         metadata = request.metadata or {}
+        send_to_external = request.send_to_external
         
         if not products:
             raise HTTPException(status_code=400, detail="No products provided")
         
+        # Transform products to external API format
+        transformed_data = transform_to_external_format(products)
+        logger.info(transformed_data)
         # Create timestamp for this upload
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -631,9 +638,11 @@ async def upload_products(request: UploadProductsRequest):
                 "total_products": len(products),
                 "upload_type": "manual_edit",
                 "source": metadata.get("source", "edit_interface"),
+                "sent_to_external": send_to_external,
                 **metadata
             },
-            "products": products
+            "products": products,
+            "transformed_data": transformed_data if send_to_external else None
         }
         
         # Save to upload_data directory
@@ -649,20 +658,187 @@ async def upload_products(request: UploadProductsRequest):
         
         logger.info(f"Successfully saved {len(products)} products to {upload_file}")
         
+        # Send to external API if requested
+        external_response = None
+        if send_to_external:
+            external_response = await send_to_external_api(transformed_data)
+            logger.info(f"Sent {len(products)} products to external API")
+        
         return {
             "success": True,
-            "message": f"Successfully uploaded {len(products)} products",
+            "message": f"Successfully uploaded {len(products)} products" + 
+                      (" and sent to external API" if send_to_external else ""),
             "data": {
                 "products_count": len(products),
                 "upload_file": upload_file,
-                "timestamp": timestamp
+                "timestamp": timestamp,
+                "sent_to_external": send_to_external,
+                "external_response": external_response
             }
         }
         
     except Exception as e:
         logger.error(f"Error uploading products: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+
+def transform_to_external_format(products):
+    """Transform products to external API format"""
+    transformed_products = []
     
+    for product in products:
+        # Skip products with "Error" in the name or no images
+        if (product.get("product_name") == "Error" or 
+            not product.get("product_images") or 
+            len(product.get("product_images", [])) == 0):
+            continue
+        
+        # Handle categories - extract category names if they're dictionaries
+        categories = product.get("categories", [])
+        category_labels = []
+        
+        for category in categories:
+            if isinstance(category, dict):
+                # Extract name from category dictionary if available
+                category_labels.append(category.get("name", ""))
+            else:
+                category_labels.append(str(category))
+        
+        # Basic product information
+        transformed = {
+            "product_name": product.get("product_name", ""),
+            "category_name": {
+                "label": " > ".join(category_labels) if category_labels else "Uncategorized",
+                "value": " > ".join([str(i) for i in range(len(category_labels))]) if category_labels else ""
+            },
+            "description": product.get("description", ""),
+            "status": "1",
+            "product_image": {
+                "uploaded_image_url": product.get("product_images", [""])[0] if product.get("product_images") else "",
+                "uploaded_image_key": "",
+                "media_type": "image"
+            },
+            "product_video": {},
+            "product_media": [],
+            "meta_tag_title": product.get("meta_title", ""),
+            "meta_tag_description": product.get("meta_description", ""),
+            "seo_url": product.get("slug", product.get("url", "")),
+            "variantPrices": [],
+            "isPremium": False,
+            "is_customize": 0,
+            "variant_gender": "",
+            "approximate_delivery_days": "",
+            "selectedCustomizationFields": [],
+            "pickupAddressId": '',
+            "packageInfo": {
+                "weight": product.get("weight", 0.5),
+                "dimensions": {
+                    "length": "35",
+                    "width": "24",
+                    "height": "5"
+                }
+            },
+            "isReturnable": False,
+            "maxDaysToReturn": None
+        }
+        
+        # Add product media (all images)
+        for img_url in product.get("product_images", []):
+            transformed["product_media"].append({
+                "uploaded_image_url": img_url,
+                "uploaded_image_key": "",
+                "media_type": "image"
+            })
+        
+        # Create variant structure
+        variant_price = {
+            "rowId": 0,
+            "variants": [],
+            "quantity": str(product.get("stock", 100)),
+            "regularPrice": str(product.get("price", 0)),
+            "discountedPrice": str(product.get("discounted_price", product.get("price", 0)))
+        }
+        
+        # Add color variants if available
+        if "colors" in product and product["colors"]:
+            color_variant = {
+                "optionId": "",
+                "optionName": "Color",
+                "optionValues": []
+            }
+            for color in product["colors"]:
+                color_variant["optionValues"].append({
+                    "code": color.get("color_code", ""),
+                    "value": color.get("id", ""),
+                    "label": color.get("option_value_name", "")
+                })
+            variant_price["variants"].append(color_variant)
+        
+        # Add size variants if available
+        if "sizes" in product and product["sizes"]:
+            size_variant = {
+                "optionId": "",
+                "optionName": "Size",
+                "optionValues": []
+            }
+            for size in product["sizes"]:
+                size_variant["optionValues"].append({
+                    "code": "",
+                    "value": size.get("_id", ""),
+                    "label": size.get("option_value_name", "")
+                })
+            variant_price["variants"].append(size_variant)
+        
+        # Add material variants if available
+        if "material" in product and product["material"]:
+            material_variant = {
+                "optionId": "601a6a544e966936d4f475e2",
+                "optionName": "Materials",
+                "optionValues": []
+            }
+            # Handle material data - it might be a string or object
+            material_data = product["material"]
+            if isinstance(material_data, dict) and "_id" in material_data:
+                # Extract material info from the _id field
+                material_text = material_data["_id"]
+                material_variant["optionValues"].append({
+                    "code": "",
+                    "value": material_text,  # Using the text as value
+                    "label": material_text   # Using the text as label
+                })
+            elif isinstance(material_data, str):
+                material_variant["optionValues"].append({
+                    "code": "",
+                    "value": material_data,
+                    "label": material_data
+                })
+            
+            variant_price["variants"].append(material_variant)
+        
+        transformed["variantPrices"].append(variant_price)
+        transformed_products.append(transformed)
+    
+    return {"products": transformed_products}
+async def send_to_external_api(transformed_data):
+    """Send transformed data to external API"""
+    try:
+        external_api_url = "https://www.rte.in/api/product/upload-scraped-product-to-particular-sellers-dashboard"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                external_api_url, 
+                json=transformed_data,
+                headers={"Content-Type": "application/json"}
+            ) as response:
+                result = await response.json()
+                return {
+                    "status": response.status,
+                    "response": result
+                }
+    except Exception as e:
+        logger.error(f"Error sending to external API: {e}")
+        return {"error": str(e)}
+
 @app.get("/results/{task_id}")
 async def get_results(task_id: str):
     if task_id not in active_tasks:
@@ -806,7 +982,7 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
         await detailed_progress_callback("initialization", "ai_agent", 5, "Initializing AI agent")
         
         # Initialize AI agent
-        from scraper_ai_agent import AIProductScraper
+        from scraper_ai_agent_deep import AIProductScraper
         scraper = AIProductScraper()
         
         if not scraper.ai_agent:
