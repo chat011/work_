@@ -814,11 +814,18 @@ class SimpleProductScraper:
         return [r for r in results if not isinstance(r, Exception)]
 
     async def _scrape_single_product_with_browser(self, url: str, browser):
-        """Scrape a single product using an existing browser instance"""
+        """Scrape a single product using an existing browser instance with improved timeout handling"""
         page = await browser.new_page()
         try:
-            # Set timeout and navigation options for better performance
-            await page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            # Set longer timeout and multiple fallback strategies
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)  # Increased from 15000 to 45000
+            
+            # Wait for additional content to load with shorter timeout
+            try:
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except:
+                # Continue even if networkidle times out - we have domcontentloaded
+                pass
             
             # Use evaluate to get HTML content faster
             content = await page.evaluate("document.documentElement.outerHTML")
@@ -826,16 +833,47 @@ class SimpleProductScraper:
             
             return await self._parse_product_data(soup, url)
         except Exception as e:
-            self.log(f"Error scraping {url}: {e}", "ERROR")
-            return {
-                "url": url,
-                "product_name": "Error",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            }
+            # Enhanced error handling - try alternative loading strategies
+            if "Timeout" in str(e):
+                self.log(f"Timeout for {url}, trying alternative approach", "WARNING")
+                try:
+                    # Try with just basic loading
+                    await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+                    # Don't wait for full load, just get what we can
+                    content = await page.content()
+                    soup = BeautifulSoup(content, 'html.parser')
+                    return await self._parse_product_data(soup, url)
+                except Exception as e2:
+                    self.log(f"Alternative approach also failed for {url}: {e2}", "ERROR")
+                    return {
+                        "url": url,
+                        "product_name": "Timeout Error",
+                        "error": f"Multiple timeout attempts failed: {str(e)}",
+                        "timestamp": datetime.now().isoformat(),
+                        "price": 0.0,
+                        "product_images": [],
+                        "description": "",
+                        "sizes": [],
+                        "colors": [],
+                        "material": ""
+                    }
+            else:
+                self.log(f"Error scraping {url}: {e}", "ERROR")
+                return {
+                    "url": url,
+                    "product_name": "Error",
+                    "error": str(e),
+                    "timestamp": datetime.now().isoformat(),
+                    "price": 0.0,
+                    "product_images": [],
+                    "description": "",
+                    "sizes": [],
+                    "colors": [],
+                    "material": ""
+                }
         finally:
             await page.close()
-
+            
     async def scrape_collection_with_pagination(self, url: str, max_pages: int = 20, progress_callback: Optional[Callable] = None):
         """Scrape all products across paginated collection/category pages with enhanced pagination"""
         all_products = []
