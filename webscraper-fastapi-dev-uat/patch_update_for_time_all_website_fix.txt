@@ -1,0 +1,33 @@
+Platform API (Method 1): For Shopify/WooCommerce sites, uses platform-specific APIs for fastest extraction.
+
+HTTP + JSON Extraction (Method 2): Works for ANY site with structured data (JSON-LD, JavaScript variables).
+
+HTTP + HTML Parsing (Method 3): Works for ANY traditional server-rendered website.
+
+Fast Browser (Method 4): 10-second timeout for sites with basic JavaScript.
+
+Medium Browser (Method 5): 15-second timeout for sites with complex JavaScript.
+
+Last Resort Browser (Method 6): 20-second timeout for ANY site, even slow ones.
+
+The method stops at the FIRST approach that succeeds, ensuring:
+
+Shopify sites: Usually succeed at step 1 or 2 (FAST)
+
+Other sites: Fall through to steps 3-6 (UNIVERSAL)
+
+Timeout issues are handled gracefully with fallbacks
+
+Benefits:
+
+Universal Compatibility: Works with ANY e-commerce platform
+
+Progressive Timeouts: Avoids your timeout issues with adaptive waiting
+
+Speed Optimization: Fast methods tried first, browser only as fallback
+
+Reliability: Continues processing even if individual URLs fail
+
+Adaptive Extraction: Chooses the best method based on site structure
+
+This approach will handle the timeout issues you're experiencing by using faster HTTP methods first and only falling back to browser methods when necessary, with appropriate timeouts for different site types.

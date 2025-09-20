@@ -611,6 +611,35 @@ class FashionScraper {
                             ${products.map((product, index) => this.createProductCard(product, index)).join('')}
                         </div>
                     `;
+            // after inserting productsHtml:
+setTimeout(() => {
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.removeEventListener('click', window.__fashionSelectAllHandler);
+        window.__fashionSelectAllHandler = () => this.selectAllProducts();
+        selectAllBtn.addEventListener('click', window.__fashionSelectAllHandler);
+    }
+
+    const editUploadBtn = document.getElementById('editUploadBtn');
+    if (editUploadBtn) {
+        editUploadBtn.removeEventListener('click', window.__fashionEditHandler);
+        window.__fashionEditHandler = () => this.editSelectedProducts();
+        editUploadBtn.addEventListener('click', window.__fashionEditHandler);
+    }
+
+    const grid = document.querySelector('.products-grid');
+    if (grid) {
+        grid.removeEventListener('change', window.__fashionCheckboxHandler);
+        window.__fashionCheckboxHandler = (e) => {
+            if (e.target.classList.contains('product-checkbox')) {
+                this.handleProductSelection();
+            }
+        };
+        grid.addEventListener('change', window.__fashionCheckboxHandler);
+    }
+
+    this.handleProductSelection();
+}, 50);
 
             this.addMessage(`
                         <strong>🛍️ Extracted Products (${products.length})</strong>
@@ -676,20 +705,20 @@ class FashionScraper {
     }
 
     handleProductSelection() {
-        const checkboxes = document.querySelectorAll('.product-checkbox');
-        const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+    const checkboxes = document.querySelectorAll('.product-checkbox');
+    const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
 
-        // Update selected count
-        const selectedCountSpan = document.getElementById('selectedCount');
-        if (selectedCountSpan) {
-            selectedCountSpan.textContent = selectedCount;
-        }
+    // Update selected count
+    const selectedCountSpan = document.getElementById('selectedCount');
+    if (selectedCountSpan) {
+        selectedCountSpan.textContent = selectedCount;
+    }
 
-        // Show/hide Edit & Upload button
-        const editUploadBtn = document.getElementById('editUploadBtn');
-        if (editUploadBtn) {
-            editUploadBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
-        }
+    // Show/hide Edit & Upload button
+    const editUploadBtn = document.getElementById('editUploadBtn');
+    if (editUploadBtn) {
+        editUploadBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
+    }
 
         // Update visual selection state
         checkboxes.forEach(checkbox => {
@@ -714,15 +743,18 @@ class FashionScraper {
     }
 
     selectAllProducts() {
-        const checkboxes = document.querySelectorAll('.product-checkbox');
-        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+    const checkboxes = document.querySelectorAll('.product-checkbox');
+    const allSelected = Array.from(checkboxes).every(cb => cb.checked);
 
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = !allSelected;
-        });
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allSelected;
+        // Manually trigger the change event
+        const event = new Event('change', { bubbles: true });
+        checkbox.dispatchEvent(event);
+    });
 
-        this.handleProductSelection();
-    }
+    this.handleProductSelection();
+}
 
     editSelectedProducts() {
         const checkboxes = document.querySelectorAll('.product-checkbox:checked');
