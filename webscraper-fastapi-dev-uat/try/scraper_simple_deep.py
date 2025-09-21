@@ -42,10 +42,15 @@ class UniversalProductScraper:
                 '.product-single__title', '.ProductItem-details-title'
             ],
             'price': [
+             # WooCommerce specific price selectors
+                '.price .woocommerce-Price-amount',
+                '.woocommerce-Price-amount.amount',
+                '.woocommerce-Price-amount',
+                # General price selectors
                 '.price', '.current-price', '.sale-price', '.regular-price',
                 '[data-price]', '[data-testid*="price"]',
                 '.price-current', '.price-now', '.cost', '.amount',
-                '.woocommerce-Price-amount', 'p.price', '.precio', '.prix',
+                'p.price', '.precio', '.prix',
                 '[itemProp="price"]', '[itemprop="price"]', '.money',
                 '.price__current', '.price-item--regular'
             ],
@@ -467,29 +472,247 @@ class SimpleProductScraper:
         
         return None
     
-    async def _extract_using_static_html(self, url: str) -> Optional[Dict[str, Any]]:
-        """Extract from static HTML using universal selectors"""
+    async def _extract_using_static_html(self, url: str) -> Dict[str, Any]:
+        """Enhanced static HTML extraction with comprehensive price detection"""
         try:
-            async with httpx.AsyncClient(timeout=12) as client:
-                response = await client.get(url, headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                })
+            html_content = await self._fetch_page_content_requests(url)
+            if not html_content:
+                return None
                 
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    
-                    return {
-                        "product_name": self._extract_product_name_universal(soup),
-                        "price": self._extract_price_universal(soup),
-                        "product_images": self._extract_images_universal(soup, url),
-                        "description": self._extract_description_universal(soup),
-                        "extraction_method": "static_html_parsing"
-                    }
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Extract basic data
+            product_name = self._extract_product_name(soup)
+            if not product_name or product_name.strip() == "":
+                return None
+                
+            description = self._extract_description(soup)
+            images = self._extract_images(soup, url)
+            
+            # ENHANCED PRICE EXTRACTION
+            price, discounted_price = self._extract_price_comprehensive(soup)
+            
+            # If still no price, try additional methods
+            if not price:
+                price = self._extract_price_from_text_content(soup)
+                
+            # Extract other product details
+            categories = self._extract_categories(soup)
+            sizes = self._extract_sizes(soup) 
+            colors = self._extract_colors(soup)
+            material = self._extract_material(soup)
+            stock = self._extract_stock_comprehensive(soup)
+            availability = self._extract_availability_comprehensive(soup)
+            
+            return {
+                'product_name': product_name,
+                'price': price or 0.0,  # Ensure we always return a number
+                'discounted_price': discounted_price,
+                'description': description,
+                'product_images': images,
+                'categories': categories,
+                'sizes': sizes,
+                'colors': colors, 
+                'material': material,
+                'stock': stock,
+                'availability': availability,
+                'url': url,
+                'extraction_method': 'enhanced_static_html',
+                'timestamp': datetime.now().isoformat()
+            }
+            
         except Exception as e:
-            self.log(f"Static HTML extraction failed: {e}", "DEBUG")
+            self.log(f"Enhanced static HTML extraction failed: {e}", "ERROR")
+            return None
+
+    def _extract_price_comprehensive(self, soup):
+        """Comprehensive price extraction for various e-commerce platforms"""
+        price = None
+        discounted_price = None
+        
+        # Method 1: JSON-LD structured data
+        json_ld_scripts = soup.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                
+                # Look for Product schema
+                if data.get('@type') == 'Product' or 'Product' in str(data.get('@type', '')):
+                    offers = data.get('offers', {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    
+                    price_val = offers.get('price') or offers.get('lowPrice')
+                    if price_val:
+                        price = self._clean_price(str(price_val))
+                        break
+            except:
+                continue
+        
+        if price:
+            return price, discounted_price
+        
+        # Method 2: Meta properties (Open Graph, etc.)
+        price_selectors = [
+            'meta[property="product:price:amount"]',
+            'meta[property="og:price:amount"]', 
+            'meta[name="price"]',
+            'meta[itemprop="price"]',
+            'meta[property="product:price"]'
+        ]
+        
+        for selector in price_selectors:
+            meta = soup.select_one(selector)
+            if meta:
+                price = self._clean_price(meta.get('content', ''))
+                if price:
+                    break
+        
+        if price:
+            return price, discounted_price
+        
+        # Method 3: Enhanced CSS selectors for price (ORDER MATTERS - most specific first)
+        price_selectors = [
+            # Specific price classes (try these first)
+            '.price-current .price', '.current-price .amount', '.selling-price .value',
+            '.product-price-value', '.price-box .price', '.price-wrapper .price',
+            
+            # WooCommerce specific
+            '.woocommerce-price-amount bdi', '.price_color', '.woo-price .amount',
+            '.woocommerce-Price-amount', '.price .woocommerce-Price-amount',
+            
+            # Shopify specific  
+            '.price-item--regular .price', '.price__current', '.product-form__price',
+            '.price-list .price', '.product-price .money',
+            
+            # Common patterns
+            '.price .amount', '.current-price', '.selling-price', '.final-price',
+            '.regular-price', '.product-price', '.price-now', '.price-value',
+            '.cost', '.amount', '.value', '.money',
+            
+            # Generic patterns (try after specific ones)
+            '[class*="price"] .amount', '[class*="price"] span', '[class*="cost"]',
+            '[id*="price"]', '[data-price]', '[itemprop="price"]',
+            
+            # Broader selectors (last resort)
+            '.price', '[class*="price"]'
+        ]
+        
+        for selector in price_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements:
+                    text = element.get_text(strip=True)
+                    extracted_price = self._clean_price(text)
+                    if extracted_price and extracted_price > 0:
+                        # Check if this looks like a price (has currency or reasonable number)
+                        element_html = str(element)
+                        if any(symbol in text or symbol in element_html for symbol in ['₹', '$', '€', '£', 'Rs', 'INR', 'USD']):
+                            if not price or extracted_price < price:  # Take the lower price as current
+                                if price and price > extracted_price:
+                                    discounted_price = extracted_price
+                                else:
+                                    price = extracted_price
+            except:
+                continue
+        
+        if price:
+            return price, discounted_price
+        
+        # Method 4: Search text content for currency patterns
+        price = self._extract_price_from_text_content(soup)
+        if price:
+            return price, discounted_price
+        
+        # Method 5: JavaScript variables in script tags
+        script_tags = soup.find_all('script')
+        for script in script_tags:
+            if script.string:
+                script_content = script.string
+                
+                # Common JS variable patterns
+                js_patterns = [
+                    r'["\']price["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)',
+                    r'["\']currentPrice["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)',
+                    r'["\']sellingPrice["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)',
+                    r'["\']regularPrice["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)',
+                    r'data-price=["\'](\d+(?:\.\d{2})?)["\']',
+                    r'price:\s*["\']?(\d+(?:\.\d{2})?)["\']?',
+                    r'amount["\']?\s*:\s*["\']?(\d+(?:\.\d{2})?)'
+                ]
+                
+                for pattern in js_patterns:
+                    matches = re.findall(pattern, script_content, re.IGNORECASE)
+                    if matches:
+                        for match in matches:
+                            extracted_price = self._clean_price(match)
+                            if extracted_price and extracted_price > 0:
+                                price = extracted_price
+                                break
+                if price:
+                    break
+        
+        return price, discounted_price
+
+    def _extract_price_from_text_content(self, soup):
+        """Extract price from text content using regex patterns"""
+        text_content = soup.get_text()
+        
+        # Indian Rupee patterns (most common first)
+        currency_patterns = [
+            r'₹\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # ₹1,299.99
+            r'Rs\.?\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # Rs. 1299
+            r'INR\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # INR 1299  
+            r'Price:\s*₹?\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # Price: ₹1299
+            r'MRP:?\s*₹?\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # MRP: ₹1299
+            r'Cost:?\s*₹?\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # Cost: ₹1299
+            r'\$\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # $29.99
+            r'€\s*([0-9,]+(?:\.[0-9]{1,2})?)',  # €29.99
+            r'£\s*([0-9,]+(?:\.[0-9]{1,2})?)'   # £29.99
+        ]
+        
+        for pattern in currency_patterns:
+            matches = re.findall(pattern, text_content, re.IGNORECASE)
+            if matches:
+                for match in matches:
+                    price = self._clean_price(match)
+                    if price and 1 <= price <= 1000000:  # Reasonable price range
+                        return price
         
         return None
-    
+
+    def _clean_price(self, price_text):
+        """Clean and convert price text to float"""
+        if not price_text:
+            return None
+        
+        # Remove all non-numeric characters except decimal points and commas
+        import re
+        cleaned = re.sub(r'[^\d.,]', '', str(price_text))
+        
+        # Handle different decimal formats
+        if ',' in cleaned and '.' in cleaned:
+            # Format like 1,299.99 - comma is thousands separator
+            cleaned = cleaned.replace(',', '')
+        elif ',' in cleaned and cleaned.count(',') == 1 and len(cleaned.split(',')[1]) <= 2:
+            # Format like 1299,99 - comma is decimal separator  
+            cleaned = cleaned.replace(',', '.')
+        elif ',' in cleaned:
+            # Multiple commas - likely thousands separators
+            cleaned = cleaned.replace(',', '')
+        
+        try:
+            price = float(cleaned)
+            # Sanity check - price should be reasonable
+            if 1 <= price <= 1000000:  # Between 1 and 10 lakh
+                return price
+        except:
+            pass
+        
+        return None
+
     def _extract_product_name_universal(self, soup: BeautifulSoup) -> str:
         """Extract product name using universal selectors"""
         for selector in self.universal_scraper.universal_selectors['product_name']:
@@ -507,8 +730,28 @@ class SimpleProductScraper:
         return "Unknown Product"
     
     def _extract_price_universal(self, soup: BeautifulSoup) -> float:
-        """Extract price using universal selectors"""
+        """Extract price using universal selectors with enhanced WooCommerce support"""
+        # Try WooCommerce-specific patterns first
+        woocommerce_selectors = [
+            '.price .woocommerce-Price-amount',
+            '.woocommerce-Price-amount.amount',
+            '.woocommerce-Price-amount'
+        ]
+        
+        for selector in woocommerce_selectors:
+            elements = soup.select(selector)
+            for element in elements:
+                price_text = element.get_text(strip=True)
+                # Special handling for WooCommerce price format
+                price = self._parse_woocommerce_price(price_text)
+                if price > 0:
+                    return price
+        
+        # Fall back to general price selectors
         for selector in self.universal_scraper.universal_selectors['price']:
+            if selector in woocommerce_selectors:
+                continue  # Skip ones we already tried
+                
             elements = soup.select(selector)
             for element in elements:
                 price_text = element.get_text(strip=True)
@@ -518,8 +761,24 @@ class SimpleProductScraper:
         
         return 0.0
 
+    def _parse_woocommerce_price(self, price_text: str) -> float:
+        """Specialized parser for WooCommerce price formats"""
+        if not price_text:
+            return 0.0
+        
+        # Handle Indian Rupee format: ₹1,399.00
+        if '₹' in price_text:
+            # Extract numeric parts
+            price_match = re.search(r'₹\s*([\d,]+\.?\d*)', price_text)
+            if price_match:
+                price_str = price_match.group(1)
+                return self._parse_price_universal(price_str)
+        
+        # Handle other currency formats
+        return self._parse_price_universal(price_text)
+
     def _parse_price_universal(self, price_text: str) -> float:
-        """Universal price parser with improved logic"""
+        """Universal price parser with improved logic for various formats"""
         if not price_text:
             return 0.0
         
@@ -529,7 +788,16 @@ class SimpleProductScraper:
         if not cleaned:
             return 0.0
         
-        # Handle different decimal separators and thousands separators
+        # Handle Indian number format (1,00,000.00)
+        if cleaned.count(',') > 1:
+            # Remove all commas for Indian numbering system
+            cleaned = cleaned.replace(',', '')
+            try:
+                return float(cleaned)
+            except ValueError:
+                return 0.0
+        
+        # Handle standard international formats
         try:
             # Case 1: Has both comma and dot - determine which is decimal separator
             if ',' in cleaned and '.' in cleaned:
@@ -553,8 +821,6 @@ class SimpleProductScraper:
                 else:
                     # Likely thousands separator (1,000 or 1,000,000)
                     cleaned = cleaned.replace(',', '')
-            
-            # Case 3: Only dots or no separators - use as is
             
             return float(cleaned)
             
@@ -1461,7 +1727,203 @@ class SimpleProductScraper:
                 successful_results.append(result)
         
         return successful_results
+    def _extract_stock_comprehensive(self, soup):
+        """Comprehensive stock extraction"""
+        # Try structured data first
+        json_ld_scripts = soup.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                
+                # Look for availability in offers
+                if data.get('@type') == 'Product':
+                    offers = data.get('offers', {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    
+                    availability = offers.get('availability', '')
+                    if 'InStock' in availability:
+                        return 100  # Default in-stock quantity
+                    elif 'OutOfStock' in availability:
+                        return 0
+            except:
+                continue
+        
+        # Try CSS selectors
+        stock_selectors = [
+            '.stock-quantity', '.inventory-count', '.qty-available',
+            '.stock', '.inventory', '.quantity', '.qty', '.stock-status',
+            '[class*="stock"]', '[class*="inventory"]', '[class*="qty"]',
+            '[data-stock]', '[data-quantity]', '[data-inventory]'
+        ]
+        
+        for selector in stock_selectors:
+            try:
+                element = soup.select_one(selector)
+                if element:
+                    text = element.get_text(strip=True)
+                    # Extract numbers from stock text
+                    numbers = re.findall(r'\d+', text)
+                    if numbers:
+                        return int(numbers[0])
+            except:
+                continue
+        
+        return 100  # Default stock
 
+    def _extract_availability_comprehensive(self, soup):
+        """Comprehensive availability extraction"""
+        # Check JSON-LD first
+        json_ld_scripts = soup.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                
+                if data.get('@type') == 'Product':
+                    offers = data.get('offers', {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+                    
+                    availability = offers.get('availability', '')
+                    if 'InStock' in availability:
+                        return 'in_stock'
+                    elif 'OutOfStock' in availability:
+                        return 'out_of_stock'
+            except:
+                continue
+        
+        # Check for out of stock indicators in text
+        text_content = soup.get_text().lower()
+        out_of_stock_indicators = [
+            'out of stock', 'sold out', 'unavailable', 'not available',
+            'stock out', 'temporarily unavailable', 'coming soon',
+            'notify when available', 'out-of-stock', 'soldout'
+        ]
+        
+        for indicator in out_of_stock_indicators:
+            if indicator in text_content:
+                return 'out_of_stock'
+        
+        # Check CSS selectors for availability
+        availability_selectors = [
+            '.out-of-stock', '.sold-out', '.unavailable',
+            '.in-stock', '.available', '.stock-available',
+            '[class*="out-of-stock"]', '[class*="sold-out"]',
+            '[class*="in-stock"]', '[class*="available"]'
+        ]
+        
+        for selector in availability_selectors:
+            element = soup.select_one(selector)
+            if element:
+                text = element.get_text().lower()
+                if any(indicator in text for indicator in out_of_stock_indicators):
+                    return 'out_of_stock'
+                elif any(indicator in text for indicator in ['in stock', 'available', 'add to cart']):
+                    return 'in_stock'
+        
+        return 'in_stock'  # Default to in stock
+
+    def _extract_sizes(self, soup):
+        """Enhanced size extraction"""
+        sizes = []
+        
+        # Try JSON-LD first
+        json_ld_scripts = soup.find_all('script', type='application/ld+json')
+        for script in json_ld_scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, list):
+                    data = data[0]
+                
+                # Look for size variations
+                if data.get('@type') == 'Product':
+                    # Check for variants or offers with sizes
+                    variants = data.get('hasVariant', []) or data.get('model', [])
+                    if isinstance(variants, list):
+                        for variant in variants:
+                            if isinstance(variant, dict):
+                                size = variant.get('size') or variant.get('additionalProperty', {}).get('value')
+                                if size:
+                                    sizes.append(size)
+            except:
+                continue
+        
+        if sizes:
+            return sizes
+        
+        # CSS selectors for sizes
+        size_selectors = [
+            '.size-options option', '.size-selector option', '.sizes option',
+            '.size-list li', '.size-buttons button', '.size-chips span',
+            '[class*="size"] option', '[class*="size"] li', '[class*="size"] span',
+            '[data-size]', '.variant-size', '.product-size'
+        ]
+        
+        for selector in size_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements:
+                    size_text = element.get_text(strip=True)
+                    if size_text and size_text not in sizes:
+                        # Filter out non-size text
+                        if len(size_text) <= 10 and any(c in size_text for c in ['S', 'M', 'L', 'X', '28', '30', '32', '34', '36', '38', '40', '42']):
+                            sizes.append(size_text)
+            except:
+                continue
+        
+        return sizes[:10]  # Limit to 10 sizes
+
+    def _extract_colors(self, soup):
+        """Enhanced color extraction"""
+        colors = []
+        
+        # CSS selectors for colors
+        color_selectors = [
+            '.color-options option', '.color-selector option', '.colors option',
+            '.color-list li', '.color-buttons button', '.color-chips span',
+            '[class*="color"] option', '[class*="color"] li', '[class*="color"] span',
+            '[data-color]', '.variant-color', '.product-color'
+        ]
+        
+        for selector in color_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements:
+                    color_text = element.get_text(strip=True)
+                    if color_text and color_text not in colors and len(color_text) <= 20:
+                        colors.append(color_text)
+            except:
+                continue
+        
+        return colors[:10]  # Limit to 10 colors
+
+    def _extract_material(self, soup):
+        """Enhanced material extraction"""
+        # Look for material in meta tags
+        material_selectors = [
+            'meta[name="material"]', 'meta[property="product:material"]',
+            '[itemprop="material"]', '.material', '.fabric', '.composition',
+            '[class*="material"]', '[class*="fabric"]', '[data-material]'
+        ]
+        
+        for selector in material_selectors:
+            try:
+                element = soup.select_one(selector)
+                if element:
+                    if element.name == 'meta':
+                        return element.get('content', '')
+                    else:
+                        material = element.get_text(strip=True)
+                        if material and len(material) <= 50:
+                            return material
+            except:
+                continue
+        
+        return None
 # Keep all your existing extract_product_data and other methods...
 # [Rest of the original methods remain unchanged]
 

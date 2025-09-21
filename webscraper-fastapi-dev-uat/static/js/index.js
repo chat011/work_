@@ -566,131 +566,214 @@ class FashionScraper {
         this.connectWebSocket(this.currentTaskId);
     }
 
-    displayResults(result) {
-        const products = result.products || [];
-        const metadata = result.metadata || {};
 
-        // Add stats
+displayResults(result) {
+    const products = result.products || [];
+    const metadata = result.metadata || {}
+
+// Add CSS for better visual feedback
+const additionalCSS = `
+.product-card.selected {
+    border: 2px solid #8B5CF6;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.product-card.selected .product-select-overlay {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.products-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+#editUploadBtn {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+#editUploadBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+`;
+
+// Inject additional CSS if not already present
+if (!document.getElementById('additional-product-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'additional-product-styles';
+    styleElement.textContent = additionalCSS;
+    document.head.appendChild(styleElement);
+};
+
+    // Add stats container
+    this.addMessage(`
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number">${products.length}</div>
+                <div class="stat-label">Products Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.urls_processed || 0}</div>
+                <div class="stat-label">URLs Processed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.ai_stats?.ai_extraction_success || 0}</div>
+                <div class="stat-label">AI Extractions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.total_pages_processed || 0}</div>
+                <div class="stat-label">Pages Processed</div>
+            </div>
+        </div>
+    `, 'success');
+
+    if (products.length > 0) {
+        // Store products for later use
+        this.currentProducts = products;
+
+        const productsHtml = `
+            <div class="products-header">
+                <div class="products-actions">
+                    <button id="selectAllBtn" class="btn btn-secondary">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button id="editUploadBtn" class="btn btn-primary" style="display: none;">
+                        <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                ${products.map((product, index) => this.createProductCard(product, index)).join('')}
+            </div>
+        `;
+
         this.addMessage(`
-                    <div class="stats-container">
-                        <div class="stat-card">
-                            <div class="stat-number">${products.length}</div>
-                            <div class="stat-label">Products Found</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.urls_processed || 0}</div>
-                            <div class="stat-label">URLs Processed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.ai_stats?.ai_extraction_success || 0}</div>
-                            <div class="stat-label">AI Extractions</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.total_pages_processed || 0}</div>
-                            <div class="stat-label">Pages Processed</div>
-                        </div>
-                    </div>
-                `, 'success');
+            <strong>🛏️ Extracted Products (${products.length})</strong>
+            ${productsHtml}
+        `, 'system');
 
-        if (products.length > 0) {
-            // Store products for later use
-            this.currentProducts = products;
+        // Setup event listeners after DOM is inserted
+        setTimeout(() => {
+            this.setupProductEventListeners();
+        }, 100);
 
-            const productsHtml = `
-                        <div class="products-header">
-                            <div class="products-actions">
-                                <button id="selectAllBtn" class="btn btn-secondary" onclick="fashionScraper.selectAllProducts()">
-                                    <i class="fas fa-check-square"></i> Select All
-                                </button>
-                                <button id="editUploadBtn" class="btn btn-primary" style="display: none;" onclick="fashionScraper.editSelectedProducts()">
-                                    <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
-                                </button>
-                            </div>
-                        </div>
-                        <div class="products-grid">
-                            ${products.map((product, index) => this.createProductCard(product, index)).join('')}
-                        </div>
-                    `;
-            // after inserting productsHtml:
-setTimeout(() => {
+    } else {
+        this.addMessage('ℹ️ No products were found in the provided URLs.', 'system');
+    }
+}
+setupProductEventListeners() {
+    console.log('🔧 Setting up product event listeners...');
+    
+    // Select All button
     const selectAllBtn = document.getElementById('selectAllBtn');
     if (selectAllBtn) {
-        selectAllBtn.removeEventListener('click', window.__fashionSelectAllHandler);
-        window.__fashionSelectAllHandler = () => this.selectAllProducts();
-        selectAllBtn.addEventListener('click', window.__fashionSelectAllHandler);
+        selectAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Select All button clicked');
+            this.selectAllProducts();
+        });
+        console.log('✅ Select All button listener attached');
+    } else {
+        console.error('❌ selectAllBtn not found in DOM');
     }
 
+    // Edit & Upload button  
     const editUploadBtn = document.getElementById('editUploadBtn');
     if (editUploadBtn) {
-        editUploadBtn.removeEventListener('click', window.__fashionEditHandler);
-        window.__fashionEditHandler = () => this.editSelectedProducts();
-        editUploadBtn.addEventListener('click', window.__fashionEditHandler);
+        editUploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Edit & Upload button clicked');
+            this.editSelectedProducts();
+        });
+        console.log('✅ Edit & Upload button listener attached');
+    } else {
+        console.error('❌ editUploadBtn not found in DOM');
     }
 
-    const grid = document.querySelector('.products-grid');
-    if (grid) {
-        grid.removeEventListener('change', window.__fashionCheckboxHandler);
-        window.__fashionCheckboxHandler = (e) => {
-            if (e.target.classList.contains('product-checkbox')) {
+    // Product checkboxes with event delegation
+    const productsGrid = document.getElementById('productsGrid');
+    if (productsGrid) {
+        productsGrid.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('product-checkbox')) {
+                console.log(`✅ Checkbox ${e.target.id} changed to: ${e.target.checked}`);
                 this.handleProductSelection();
             }
-        };
-        grid.addEventListener('change', window.__fashionCheckboxHandler);
+        });
+        console.log('✅ Product grid change listener attached');
+    } else {
+        console.error('❌ productsGrid not found in DOM');
     }
 
+    // Initialize selection state
     this.handleProductSelection();
-}, 50);
+    console.log('🎉 All event listeners setup complete');
+}
+    // UPDATED: Remove inline onclick handlers from createProductCard
+createProductCard(product, index) {
+    const price = product.price && product.price > 0 
+        ? `₹${product.price.toLocaleString()}` 
+        : 'Price not available';
+        
+    const image = product.product_images && product.product_images.length > 0
+        ? product.product_images[0]
+        : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
 
-            this.addMessage(`
-                        <strong>🛍️ Extracted Products (${products.length})</strong>
-                        ${productsHtml}
-                    `, 'system');
-        } else {
-            this.addMessage('ℹ️ No products were found in the provided URLs.', 'system');
-        }
-    }
+    const sizes = product.sizes && product.sizes.length > 0
+        ? product.sizes.slice(0, 5).map(size => `<span class="tag">${size}</span>`).join('')
+        : '';
 
-    createProductCard(product, index) {
-        const price = product.price ? `₹${product.price.toLocaleString()}` : 'Price not available';
-        const image = product.product_images && product.product_images.length > 0
-            ? product.product_images[0]
-            : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
+    const colors = product.colors && product.colors.length > 0
+        ? product.colors.slice(0, 3).map(color => `<span class="tag">${color}</span>`).join('')
+        : '';
 
-        const sizes = product.sizes && product.sizes.length > 0
-            ? product.sizes.slice(0, 5).map(size => `<span class="tag">${size}</span>`).join('')
-            : '';
+    const material = product.material ? `<span class="tag">${product.material}</span>` : '';
 
-        const colors = product.colors && product.colors.length > 0
-            ? product.colors.slice(0, 3).map(color => `<span class="tag">${color}</span>`).join('')
-            : '';
-
-        const material = product.material ? `<span class="tag">${product.material}</span>` : '';
-
-        return `
-                    <div class="product-card" data-product-index="${index}">
-                        <div class="product-select-overlay">
-                            <input type="checkbox" class="product-checkbox" id="product-${index}" 
-                                   onchange="fashionScraper.handleProductSelection()">
-                            <label for="product-${index}" class="product-select-label">
-                                <i class="fas fa-check"></i>
-                            </label>
-                        </div>
-                        <img src="${image}" alt="${product.product_name}" class="product-image" 
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
-                        <div class="product-info">
-                            <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
-                            <div class="product-price">${price}</div>
-                            <div class="product-details">
-                                ${product.description ? product.description.substring(0, 100) + '...' : 'No description available'}
-                            </div>
-                            <div class="product-tags">
-                                ${sizes}
-                                ${colors}
-                                ${material}
-                            </div>
-                        </div>
-                    </div>
-                `;
+    return `
+        <div class="product-card" data-product-index="${index}">
+            <div class="product-select-overlay">
+                <input type="checkbox" class="product-checkbox" id="product-${index}">
+                <label for="product-${index}" class="product-select-label">
+                    <i class="fas fa-check"></i>
+                </label>
+            </div>
+            <img src="${image}" alt="${product.product_name}" class="product-image" 
+                 onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
+            <div class="product-info">
+                <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
+                <div class="product-price">${price}</div>
+                <div class="product-details">
+                    ${product.description ? product.description.substring(0, 100) + '...' : 'No description available'}
+                </div>
+                <div class="product-tags">
+                    ${sizes}
+                    ${colors}
+                    ${material}
+                </div>
+            </div>
+        </div>
+    `;
     }
 
     resetScrapingState() {
@@ -705,22 +788,30 @@ setTimeout(() => {
     }
 
     handleProductSelection() {
-    const checkboxes = document.querySelectorAll('.product-checkbox');
-    const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        
+        console.log(`📊 Selection update: ${selectedCount}/${checkboxes.length} selected`);
 
-    // Update selected count
-    const selectedCountSpan = document.getElementById('selectedCount');
-    if (selectedCountSpan) {
-        selectedCountSpan.textContent = selectedCount;
-    }
+        // Update selected count display
+        const selectedCountSpan = document.getElementById('selectedCount');
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = selectedCount;
+        }
 
-    // Show/hide Edit & Upload button
-    const editUploadBtn = document.getElementById('editUploadBtn');
-    if (editUploadBtn) {
-        editUploadBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
-    }
+        // Show/hide Edit & Upload button
+        const editUploadBtn = document.getElementById('editUploadBtn');
+        if (editUploadBtn) {
+            if (selectedCount > 0) {
+                editUploadBtn.style.display = 'inline-flex';
+                console.log(`✅ Showing Edit & Upload button (${selectedCount} selected)`);
+            } else {
+                editUploadBtn.style.display = 'none';
+                console.log('➖ Hiding Edit & Upload button (none selected)');
+            }
+        }
 
-        // Update visual selection state
+        // Update visual selection state for product cards
         checkboxes.forEach(checkbox => {
             const productCard = checkbox.closest('.product-card');
             if (productCard) {
@@ -742,18 +833,30 @@ setTimeout(() => {
         }
     }
 
+
     selectAllProducts() {
-    const checkboxes = document.querySelectorAll('.product-checkbox');
-    const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+        console.log('selectAllProducts called');
+        
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        console.log(`Found ${checkboxes.length} checkboxes`);
+        
+        if (checkboxes.length === 0) {
+            console.error('❌ No checkboxes found');
+            return;
+        }
+        
+        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+        console.log(`All selected: ${allSelected}, toggling to: ${!allSelected}`);
 
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = !allSelected;
-        // Manually trigger the change event
-        const event = new Event('change', { bubbles: true });
-        checkbox.dispatchEvent(event);
-    });
+        // Toggle all checkboxes
+        checkboxes.forEach((checkbox, index) => {
+            checkbox.checked = !allSelected;
+            console.log(`Checkbox ${index} set to: ${checkbox.checked}`);
+        });
 
-    this.handleProductSelection();
+        // Update UI
+        this.handleProductSelection();
+        console.log('✅ selectAllProducts completed');
 }
 
     editSelectedProducts() {
