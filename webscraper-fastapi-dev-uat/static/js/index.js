@@ -263,76 +263,91 @@ class FashionScraper {
     }
 
     async startScraping() {
-        const urls = this.urlInput.value.trim();
-        if (!urls) {
-            this.addMessage('⚠️ Please enter at least one URL to scrape.', 'error');
-            return;
-        }
-
-        const urlList = urls.split('\n').filter(url => url.trim()).map(url => url.trim());
-        if (urlList.length === 0) {
-            this.addMessage('⚠️ Please enter valid URLs.', 'error');
-            return;
-        }
-
-        // Get settings
-        const maxPages = parseInt(this.maxPages.value) || 50;
-        const useAiPagination = this.aiPagination.checked;
-        const aiExtractionMode = this.aiExtraction.checked;
-
-        // Clear previous results and start fresh
-        this.clearResults();
-        this.isScrapingActive = true;
-        this.scrapeBtn.textContent = 'AI Processing...';
-        this.scrapeBtn.disabled = true;
-
-        try {
-            // Start scraping
-            const response = await fetch('/scrape/ai', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    urls: urlList,
-                    max_pages_per_url: maxPages,
-                    use_ai_pagination: useAiPagination,
-                    ai_extraction_mode: aiExtractionMode
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.currentTaskId = result.data.task_id;
-                this.addMessage(`
-                            <div class="task-started-compact">
-                                <span class="status-icon">✅</span>
-                                <span class="status-text">Task started</span>
-                                <span class="task-id-container">
-                                    <span class="task-id-label">ID:</span>
-                                    <code class="task-id-code" onclick="navigator.clipboard.writeText('${this.currentTaskId}'); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000)" title="Click to copy">${this.currentTaskId}</code>
-                                </span>
-                            </div>
-                        `, 'success');
-
-                // Start monitoring progress with WebSocket
-                await this.monitorProgress();
-
-            } else {
-                throw new Error(result.error || 'Unknown error occurred');
-            }
-
-        } catch (error) {
-            console.error('Error starting scraping:', error);
-            this.addMessage(`❌ <strong>Failed to start scraping:</strong> ${error.message}`, 'error');
-            this.resetScrapingState();
-        }
+    const urls = this.urlInput.value.trim();
+    if (!urls) {
+        this.addMessage('⚠️ Please enter at least one URL to scrape.', 'error');
+        return;
     }
+
+    const urlList = urls.split('\n').filter(url => url.trim()).map(url => url.trim());
+    if (urlList.length === 0) {
+        this.addMessage('⚠️ Please enter valid URLs.', 'error');
+        return;
+    }
+
+    // Get settings
+    const maxPages = parseInt(this.maxPages.value) || 50;
+    const useAiPagination = this.aiPagination.checked;
+    const aiExtractionMode = this.aiExtraction.checked;
+
+    // Clear previous results and start fresh
+    this.clearResults();
+    this.isScrapingActive = true;
+    this.scrapeBtn.textContent = 'AI Processing...';
+    this.scrapeBtn.disabled = true;
+
+    try {
+        // ✅ Step 1: Save URLs to backend file for cron usage
+        const saveResp = await fetch('/api/save-urls', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: urlList })
+        });
+        if (!saveResp.ok) {
+            throw new Error(`Failed to save URLs (status: ${saveResp.status})`);
+        }
+        const saveData = await saveResp.json();
+        console.log("URLs saved:", saveData);
+
+        // ✅ Step 2: Start scraping task (old flow preserved)
+        const response = await fetch('/scrape/ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                urls: urlList,
+                max_pages_per_url: maxPages,
+                use_ai_pagination: useAiPagination,
+                ai_extraction_mode: aiExtractionMode
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            this.currentTaskId = result.data.task_id;
+            this.addMessage(`
+                <div class="task-started-compact">
+                    <span class="status-icon">✅</span>
+                    <span class="status-text">Task started</span>
+                    <span class="task-id-container">
+                        <span class="task-id-label">ID:</span>
+                        <code class="task-id-code"
+                              onclick="navigator.clipboard.writeText('${this.currentTaskId}'); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000)"
+                              title="Click to copy">${this.currentTaskId}</code>
+                    </span>
+                </div>
+            `, 'success');
+
+            // Start monitoring progress with WebSocket
+            await this.monitorProgress();
+
+        } else {
+            throw new Error(result.error || 'Unknown error occurred');
+        }
+
+    } catch (error) {
+        console.error('Error starting scraping:', error);
+        this.addMessage(`❌ <strong>Failed to start scraping:</strong> ${error.message}`, 'error');
+        this.resetScrapingState();
+    }
+}
+
 
     setupNotifications() {
         if ('Notification' in window) {
@@ -566,102 +581,214 @@ class FashionScraper {
         this.connectWebSocket(this.currentTaskId);
     }
 
-    displayResults(result) {
-        const products = result.products || [];
-        const metadata = result.metadata || {};
 
-        // Add stats
+displayResults(result) {
+    const products = result.products || [];
+    const metadata = result.metadata || {}
+
+// Add CSS for better visual feedback
+const additionalCSS = `
+.product-card.selected {
+    border: 2px solid #8B5CF6;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    transform: translateY(-2px);
+}
+
+.product-card.selected .product-select-overlay {
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.products-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+#editUploadBtn {
+    background: linear-gradient(135deg, #10B981, #059669);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+#editUploadBtn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+`;
+
+// Inject additional CSS if not already present
+if (!document.getElementById('additional-product-styles')) {
+    const styleElement = document.createElement('style');
+    styleElement.id = 'additional-product-styles';
+    styleElement.textContent = additionalCSS;
+    document.head.appendChild(styleElement);
+};
+
+    // Add stats container
+    this.addMessage(`
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-number">${products.length}</div>
+                <div class="stat-label">Products Found</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.urls_processed || 0}</div>
+                <div class="stat-label">URLs Processed</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.ai_stats?.ai_extraction_success || 0}</div>
+                <div class="stat-label">AI Extractions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${metadata.total_pages_processed || 0}</div>
+                <div class="stat-label">Pages Processed</div>
+            </div>
+        </div>
+    `, 'success');
+
+    if (products.length > 0) {
+        // Store products for later use
+        this.currentProducts = products;
+
+        const productsHtml = `
+            <div class="products-header">
+                <div class="products-actions">
+                    <button id="selectAllBtn" class="btn btn-secondary">
+                        <i class="fas fa-check-square"></i> Select All
+                    </button>
+                    <button id="editUploadBtn" class="btn btn-primary" style="display: none;">
+                        <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
+                    </button>
+                </div>
+            </div>
+            <div class="products-grid" id="productsGrid">
+                ${products.map((product, index) => this.createProductCard(product, index)).join('')}
+            </div>
+        `;
+
         this.addMessage(`
-                    <div class="stats-container">
-                        <div class="stat-card">
-                            <div class="stat-number">${products.length}</div>
-                            <div class="stat-label">Products Found</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.urls_processed || 0}</div>
-                            <div class="stat-label">URLs Processed</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.ai_stats?.ai_extraction_success || 0}</div>
-                            <div class="stat-label">AI Extractions</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-number">${metadata.total_pages_processed || 0}</div>
-                            <div class="stat-label">Pages Processed</div>
-                        </div>
-                    </div>
-                `, 'success');
+            <strong>🛏️ Extracted Products (${products.length})</strong>
+            ${productsHtml}
+        `, 'system');
 
-        if (products.length > 0) {
-            // Store products for later use
-            this.currentProducts = products;
+        // Setup event listeners after DOM is inserted
+        setTimeout(() => {
+            this.setupProductEventListeners();
+        }, 100);
 
-            const productsHtml = `
-                        <div class="products-header">
-                            <div class="products-actions">
-                                <button id="selectAllBtn" class="btn btn-secondary" onclick="fashionScraper.selectAllProducts()">
-                                    <i class="fas fa-check-square"></i> Select All
-                                </button>
-                                <button id="editUploadBtn" class="btn btn-primary" style="display: none;" onclick="fashionScraper.editSelectedProducts()">
-                                    <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
-                                </button>
-                            </div>
-                        </div>
-                        <div class="products-grid">
-                            ${products.map((product, index) => this.createProductCard(product, index)).join('')}
-                        </div>
-                    `;
-
-            this.addMessage(`
-                        <strong>🛍️ Extracted Products (${products.length})</strong>
-                        ${productsHtml}
-                    `, 'system');
-        } else {
-            this.addMessage('ℹ️ No products were found in the provided URLs.', 'system');
-        }
+    } else {
+        this.addMessage('ℹ️ No products were found in the provided URLs.', 'system');
+    }
+}
+setupProductEventListeners() {
+    console.log('🔧 Setting up product event listeners...');
+    
+    // Select All button
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Select All button clicked');
+            this.selectAllProducts();
+        });
+        console.log('✅ Select All button listener attached');
+    } else {
+        console.error('❌ selectAllBtn not found in DOM');
     }
 
-    createProductCard(product, index) {
-        const price = product.price ? `₹${product.price.toLocaleString()}` : 'Price not available';
-        const image = product.product_images && product.product_images.length > 0
-            ? product.product_images[0]
-            : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
+    // Edit & Upload button  
+    const editUploadBtn = document.getElementById('editUploadBtn');
+    if (editUploadBtn) {
+        editUploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Edit & Upload button clicked');
+            this.editSelectedProducts();
+        });
+        console.log('✅ Edit & Upload button listener attached');
+    } else {
+        console.error('❌ editUploadBtn not found in DOM');
+    }
 
-        const sizes = product.sizes && product.sizes.length > 0
-            ? product.sizes.slice(0, 5).map(size => `<span class="tag">${size}</span>`).join('')
-            : '';
+    // Product checkboxes with event delegation
+    const productsGrid = document.getElementById('productsGrid');
+    if (productsGrid) {
+        productsGrid.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('product-checkbox')) {
+                console.log(`✅ Checkbox ${e.target.id} changed to: ${e.target.checked}`);
+                this.handleProductSelection();
+            }
+        });
+        console.log('✅ Product grid change listener attached');
+    } else {
+        console.error('❌ productsGrid not found in DOM');
+    }
 
-        const colors = product.colors && product.colors.length > 0
-            ? product.colors.slice(0, 3).map(color => `<span class="tag">${color}</span>`).join('')
-            : '';
+    // Initialize selection state
+    this.handleProductSelection();
+    console.log('🎉 All event listeners setup complete');
+}
+    // UPDATED: Remove inline onclick handlers from createProductCard
+createProductCard(product, index) {
+    const price = product.price && product.price > 0 
+        ? `₹${product.price.toLocaleString()}` 
+        : 'Price not available';
+        
+    const image = product.product_images && product.product_images.length > 0
+        ? product.product_images[0]
+        : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
 
-        const material = product.material ? `<span class="tag">${product.material}</span>` : '';
+    const sizes = product.sizes && product.sizes.length > 0
+        ? product.sizes.slice(0, 5).map(size => `<span class="tag">${size}</span>`).join('')
+        : '';
 
-        return `
-                    <div class="product-card" data-product-index="${index}">
-                        <div class="product-select-overlay">
-                            <input type="checkbox" class="product-checkbox" id="product-${index}" 
-                                   onchange="fashionScraper.handleProductSelection()">
-                            <label for="product-${index}" class="product-select-label">
-                                <i class="fas fa-check"></i>
-                            </label>
-                        </div>
-                        <img src="${image}" alt="${product.product_name}" class="product-image" 
-                             onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
-                        <div class="product-info">
-                            <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
-                            <div class="product-price">${price}</div>
-                            <div class="product-details">
-                                ${product.description ? product.description.substring(0, 100) + '...' : 'No description available'}
-                            </div>
-                            <div class="product-tags">
-                                ${sizes}
-                                ${colors}
-                                ${material}
-                            </div>
-                        </div>
-                    </div>
-                `;
+    const colors = product.colors && product.colors.length > 0
+        ? product.colors.slice(0, 3).map(color => `<span class="tag">${color}</span>`).join('')
+        : '';
+
+    const material = product.material ? `<span class="tag">${product.material}</span>` : '';
+
+    return `
+        <div class="product-card" data-product-index="${index}">
+            <div class="product-select-overlay">
+                <input type="checkbox" class="product-checkbox" id="product-${index}">
+                <label for="product-${index}" class="product-select-label">
+                    <i class="fas fa-check"></i>
+                </label>
+            </div>
+            <img src="${image}" alt="${product.product_name}" class="product-image" 
+                 onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
+            <div class="product-info">
+                <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
+                <div class="product-price">${price}</div>
+                <div class="product-details">
+                    ${product.description ? product.description.substring(0, 100) + '...' : 'No description available'}
+                </div>
+                <div class="product-tags">
+                    ${sizes}
+                    ${colors}
+                    ${material}
+                </div>
+            </div>
+        </div>
+    `;
     }
 
     resetScrapingState() {
@@ -678,8 +805,10 @@ class FashionScraper {
     handleProductSelection() {
         const checkboxes = document.querySelectorAll('.product-checkbox');
         const selectedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
+        
+        console.log(`📊 Selection update: ${selectedCount}/${checkboxes.length} selected`);
 
-        // Update selected count
+        // Update selected count display
         const selectedCountSpan = document.getElementById('selectedCount');
         if (selectedCountSpan) {
             selectedCountSpan.textContent = selectedCount;
@@ -688,10 +817,16 @@ class FashionScraper {
         // Show/hide Edit & Upload button
         const editUploadBtn = document.getElementById('editUploadBtn');
         if (editUploadBtn) {
-            editUploadBtn.style.display = selectedCount > 0 ? 'inline-flex' : 'none';
+            if (selectedCount > 0) {
+                editUploadBtn.style.display = 'inline-flex';
+                console.log(`✅ Showing Edit & Upload button (${selectedCount} selected)`);
+            } else {
+                editUploadBtn.style.display = 'none';
+                console.log('➖ Hiding Edit & Upload button (none selected)');
+            }
         }
 
-        // Update visual selection state
+        // Update visual selection state for product cards
         checkboxes.forEach(checkbox => {
             const productCard = checkbox.closest('.product-card');
             if (productCard) {
@@ -713,16 +848,31 @@ class FashionScraper {
         }
     }
 
-    selectAllProducts() {
-        const checkboxes = document.querySelectorAll('.product-checkbox');
-        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
 
-        checkboxes.forEach(checkbox => {
+    selectAllProducts() {
+        console.log('selectAllProducts called');
+        
+        const checkboxes = document.querySelectorAll('.product-checkbox');
+        console.log(`Found ${checkboxes.length} checkboxes`);
+        
+        if (checkboxes.length === 0) {
+            console.error('❌ No checkboxes found');
+            return;
+        }
+        
+        const allSelected = Array.from(checkboxes).every(cb => cb.checked);
+        console.log(`All selected: ${allSelected}, toggling to: ${!allSelected}`);
+
+        // Toggle all checkboxes
+        checkboxes.forEach((checkbox, index) => {
             checkbox.checked = !allSelected;
+            console.log(`Checkbox ${index} set to: ${checkbox.checked}`);
         });
 
+        // Update UI
         this.handleProductSelection();
-    }
+        console.log('✅ selectAllProducts completed');
+}
 
     editSelectedProducts() {
         const checkboxes = document.querySelectorAll('.product-checkbox:checked');

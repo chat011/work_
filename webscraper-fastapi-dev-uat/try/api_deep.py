@@ -1,4 +1,3 @@
-import pathlib
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +30,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import httpx
 from selectolax.parser import HTMLParser
-from playwright.async_api import async_playwright
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,6 +46,10 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+DATA_DIR = pathlib.Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+TARGETS_FILE = DATA_DIR / "targets.json"
 
 LOGS_DIR = pathlib.Path("logs")
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1502,108 +1505,27 @@ async def get_active_tasks():
 class UrlRequest(BaseModel):
     base_url: str
 
-# @app.post("/api/get-domain-urls")
-# async def get_domain_urls(req: UrlRequest):
-#     try:
-#         base_url = req.base_url.strip()
-#         if not base_url.startswith(("http://", "https://")):
-#             base_url = "https://" + base_url
-
-#         headers = {"User-Agent": "Mozilla/5.0"}
-
-#         async with httpx.AsyncClient(
-#             timeout=httpx.Timeout(10.0, connect=5.0),
-#             verify=False,
-#             follow_redirects=True,
-#             headers=headers
-#         ) as client:
-#             resp = await client.get(base_url)
-            
-#             if resp.status_code >= 400:
-#                 raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
-
-#             tree = HTMLParser(resp.text)
-#             sublinks = set()
-#             for a in tree.css("a[href]"):
-#                 href = a.attributes.get("href")
-#                 if not href:
-#                     continue
-#                 full_url = urljoin(base_url, href)
-#                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
-#                     sublinks.add(full_url)
-
-#             sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
-
-#             semaphore = asyncio.Semaphore(5)
-#             async def fetch(url):
-#                 async with semaphore:
-#                     try:
-#                         return url, await client.get(url)
-#                     except Exception:
-#                         return url, None
-
-#             responses = await asyncio.gather(*[fetch(u) for u in sublinks])
-
-#             collections_with_products, product_urls, urls_array = [], set(), set()
-#             for url, res in responses:
-#                 if not res or res.status_code != 200:
-#                     continue
-#                 tree = HTMLParser(res.text)
-#                 product_links = [
-#                     urljoin(base_url, a.attributes.get("href"))
-#                     for a in tree.css("a[href*='/products/']")
-#                 ]
-#                 if product_links:
-#                     collections_with_products.append(url)
-#                     product_urls.update(product_links)
-#                 urls_array.add(url)
-
-#             return {
-#                 "success": True,
-#                 "base_url": base_url,
-#                 "collections_count": len(collections_with_products),
-#                 "collections_with_products": sorted(collections_with_products),
-#                 "total_products": len(product_urls),
-#                 "all_product_urls": sorted(product_urls),
-#                 "urls_array": sorted(urls_array)
-#             }
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
-
-async def fetch_html(client, url):
-    try:
-        resp = await client.get(url)
-        if resp.status_code == 200:
-            return resp.text
-    except Exception:
-        return None
-    return None
-
 @app.post("/api/get-domain-urls")
 async def get_domain_urls(req: UrlRequest):
     try:
         base_url = req.base_url.strip()
         if not base_url.startswith(("http://", "https://")):
-            base_url = "https://" + base_url  # default try https
+            base_url = "https://" + base_url
 
         headers = {"User-Agent": "Mozilla/5.0"}
 
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(15.0, connect=5.0),
+            timeout=httpx.Timeout(10.0, connect=5.0),
             verify=False,
             follow_redirects=True,
             headers=headers
         ) as client:
-            # Try HTTPS first, fallback to HTTP if fails
-            html = await fetch_html(client, base_url)
-            if not html and base_url.startswith("https://"):
-                base_url = base_url.replace("https://", "http://", 1)
-                html = await fetch_html(client, base_url)
-            if not html:
-                raise HTTPException(status_code=400, detail="Unable to fetch the site")
+            resp = await client.get(base_url)
+            
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
 
-            tree = HTMLParser(html)
+            tree = HTMLParser(resp.text)
             sublinks = set()
             for a in tree.css("a[href]"):
                 href = a.attributes.get("href")
@@ -1613,8 +1535,7 @@ async def get_domain_urls(req: UrlRequest):
                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
                     sublinks.add(full_url)
 
-            # limit crawling
-            sublinks = sorted(list(sublinks))
+            sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
 
             semaphore = asyncio.Semaphore(5)
             async def fetch(url):
@@ -1631,20 +1552,13 @@ async def get_domain_urls(req: UrlRequest):
                 if not res or res.status_code != 200:
                     continue
                 tree = HTMLParser(res.text)
-
-                # Detect Shopify (/products/) and WooCommerce (/product/)
                 product_links = [
                     urljoin(base_url, a.attributes.get("href"))
-                    for a in tree.css("a[href]")
-                    if a.attributes.get("href") and (
-                        "/products/" in a.attributes["href"] or "/product/" in a.attributes["href"]
-                    )
+                    for a in tree.css("a[href*='/products/']")
                 ]
-
                 if product_links:
                     collections_with_products.append(url)
                     product_urls.update(product_links)
-
                 urls_array.add(url)
 
             return {
@@ -1660,6 +1574,7 @@ async def get_domain_urls(req: UrlRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
 
+    
 async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30):
     """Clean up terminated tasks from memory after a delay"""
     try:
@@ -1676,53 +1591,32 @@ async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30)
 class SaveUrlsRequest(BaseModel):
     urls: List[str]
 
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
-TARGETS_FILE = os.path.join(DATA_DIR, "targets.json")
 
+# ----------------------------------------------------
+# Routes
+# ----------------------------------------------------
 @app.post("/api/save-urls")
 async def save_urls(req: SaveUrlsRequest):
     """
-    Save textarea URLs to data/targets.json every time user clicks Grab Product.
-    Keeps history of all uploads instead of overwriting.
+    Save the list of URLs to data/targets.json.
     """
     try:
         urls = [u.strip() for u in req.urls if u and u.strip()]
-        if not urls:
-            raise HTTPException(status_code=400, detail="No valid URLs provided")
-
-        # Load existing data if file exists
-        if os.path.exists(TARGETS_FILE):
-            with open(TARGETS_FILE, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    data = []
-        else:
-            data = []
-
-        # Ensure file is a list
-        if not isinstance(data, list):
-            data = [data]
-
-        # Append new entry
-        entry = {
-            "timestamp": datetime.now().isoformat(),
+        timestamp = datetime.now().isoformat()
+        payload = {
+            "timestamp": timestamp,
             "count": len(urls),
-            "urls": urls
+            "urls": urls,
         }
-        data.append(entry)
-
-        # Save back
         with open(TARGETS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
+            json.dump(payload, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"✅ Appended {len(urls)} URLs into {TARGETS_FILE}")
-        return {"success": True, "count": len(urls), "total_entries": len(data), "file": TARGETS_FILE}
-
+        logger.info(f"Saved {len(urls)} urls to {TARGETS_FILE}")
+        return {"success": True, "saved_to": str(TARGETS_FILE), "count": len(urls)}
     except Exception as e:
-        logger.error(f"❌ Failed to save URLs: {e}")
+        logger.error(f"Error saving urls: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/scrape/ai")
 async def scrape_ai(req: SaveUrlsRequest, background_tasks: BackgroundTasks):

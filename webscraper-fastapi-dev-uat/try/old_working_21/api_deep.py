@@ -1,4 +1,3 @@
-import pathlib
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -13,7 +12,7 @@ import os
 from datetime import datetime
 import logging
 import time
-from scraper_simple_deep import scrape_urls_simple_api, SimpleProductScraper
+# from scraper_simple_deep import scrape_urls_simple_api, SimpleProductScraper
 from scraper_ai_agent_deep import scrape_urls_ai_agent
 from image_url_fixer_deep import fix_product_images
 import glob
@@ -31,7 +30,9 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import httpx
 from selectolax.parser import HTMLParser
-from playwright.async_api import async_playwright
+
+from scraper_simple_deep import UniversalEcommerceScraper
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -47,9 +48,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
-
-LOGS_DIR = pathlib.Path("logs")
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
 
@@ -269,130 +267,34 @@ async def websocket_endpoint(websocket: WebSocket, task_id: str):
 
 @app.get("/api")
 async def api_info():
-    """Enhanced API information endpoint"""
+    """API information endpoint"""
     return {
-        "message": "🚀 Enhanced Universal Web Scraper API",
-        "version": "3.0.0",
-        "capabilities": "Works with ANY e-commerce website",
+        "message": "AI-Powered Web Scraper API",
+        "version": "2.0.0",
         "scraper_types": {
-            "enhanced-universal": "🎯 Universal scraper that works with ALL e-commerce platforms",
-            "ai_agent": "🧠 AI-powered intelligent scraper using Gemini 1.5 Flash"
-        },
-        "supported_platforms": {
-            "shopify": "✅ Full support with API integration",
-            "woocommerce": "✅ Full support with REST API fallback", 
-            "magento": "✅ Full support with universal extraction",
-            "bigcommerce": "✅ Full support with universal extraction",
-            "custom_sites": "✅ Universal extraction methods",
-            "any_ecommerce": "✅ Multi-method extraction with fallbacks"
-        },
-        "extraction_methods": {
-            "platform_apis": "Direct API integration (fastest)",
-            "structured_data": "JSON-LD and microdata parsing",
-            "javascript_variables": "Product data from JS variables",
-            "meta_tags": "Open Graph and meta tag extraction",
-            "html_parsing": "Direct HTML parsing with universal selectors",
-            "browser_rendering": "Full browser rendering for dynamic content",
-            "universal_fallback": "Last resort universal extraction"
-        },
-        "features": {
-            "universal_compatibility": "Works with any e-commerce website",
-            "multiple_extraction_methods": "7 different extraction strategies",
-            "intelligent_fallbacks": "Automatic fallback when methods fail",
-            "enhanced_pagination": "Universal pagination detection",
-            "smart_url_detection": "Automatic collection vs product detection",
-            "data_validation": "Ensures extracted data quality",
-            "parallel_processing": "Fast concurrent product scraping",
-            "real_time_updates": "WebSocket progress tracking",
-            "automatic_image_fixing": "Post-processing for better image URLs"
+            "simple": "Direct HTML parsing scraper",
+            "ai_agent": "AI-powered intelligent scraper using Gemini 1.5 Flash"
         },
         "endpoints": {
             "gui": "GET / - Web GUI interface",
-            "scrape": "POST /scrape - Enhanced universal scraping (works with ANY site)",
-            "scrape/ai": "POST /scrape/ai - AI-powered intelligent scraping", 
+            "scrape": "POST /scrape - Simple scraping with direct HTML parsing",
+            "scrape/ai": "POST /scrape/ai - AI-powered intelligent scraping",
             "status": "GET /status/{task_id} - Get scraping task status",
             "websocket": "WS /ws/{task_id} - Real-time progress updates",
-            "health": "GET /health - API health check",
-            "get-domain-urls": "POST /api/get-domain-urls - Extract all URLs from domain"
+            "health": "GET /health - API health check"
         },
-        "performance": {
-            "speed": "Fast HTTP methods tried first, browser fallback when needed",
-            "reliability": "Multiple extraction methods with automatic fallbacks", 
-            "scalability": "Parallel processing with configurable concurrency",
-            "monitoring": "Real-time progress updates and detailed logging"
+        "features": {
+            "ai_agent": [
+                "Intelligent page structure analysis",
+                "Automatic pagination discovery",
+                "Dynamic product extraction",
+                "Adaptive to different website layouts",
+                "AI-powered data extraction using Gemini 1.5 Flash",
+                "Real-time WebSocket progress updates"
+            ]
         },
         "timestamp": datetime.now().isoformat()
     }
-
-# debugging endpoint for troubleshooting
-@app.post("/debug/test-url")
-async def debug_test_url(url_request: dict):
-    """Debug endpoint to test URL extraction capabilities"""
-    try:
-        url = url_request.get("url")
-        if not url:
-            raise HTTPException(status_code=400, detail="URL is required")
-        
-        # Initialize scraper for testing
-        scraper = SimpleProductScraper()
-        
-        # Test URL classification
-        is_collection = scraper.is_collection_url(url)
-        platform = scraper._get_platform(url)
-        
-        # Test accessibility
-        import requests
-        try:
-            response = requests.get(url, timeout=10, headers={
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            })
-            accessible = response.status_code == 200
-            response_size = len(response.content)
-        except:
-            accessible = False
-            response_size = 0
-        
-        # If it's a collection, try to extract product links
-        product_links = []
-        if is_collection:
-            try:
-                product_links = await scraper.extract_collection_links(url)
-                product_links = product_links[:10]  # Limit for testing
-            except:
-                pass
-        
-        # Try to extract product data if it's a product URL
-        product_data = None
-        if not is_collection:
-            try:
-                product_data = await scraper.extract_product_data_hybrid(url)
-            except Exception as e:
-                product_data = {"error": str(e)}
-        
-        return {
-            "url": url,
-            "analysis": {
-                "is_collection": is_collection,
-                "platform": platform,
-                "accessible": accessible,
-                "response_size": response_size
-            },
-            "collection_data": {
-                "product_links_found": len(product_links),
-                "sample_links": product_links[:5]
-            } if is_collection else None,
-            "product_data": product_data if not is_collection else None,
-            "recommendations": [
-                "✅ URL is accessible and should work" if accessible else "❌ URL is not accessible",
-                f"🏷️ Detected as {platform} platform",
-                f"📄 Page type: {'Collection' if is_collection else 'Product'}",
-                f"🔗 Found {len(product_links)} product links" if is_collection else "🛍️ Ready for product extraction"
-            ]
-        }
-        
-    except Exception as e:
-        logger.error(f"Debug test failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Debug test failed: {str(e)}")
 
 @app.get("/health")
 async def health_check():
@@ -408,43 +310,20 @@ async def health_check():
 @app.post("/scrape", response_model=ScrapeResponse)
 async def scrape_products(request: ScrapeRequest, background_tasks: BackgroundTasks):
     """
-    Enhanced Universal Web Scraper - Works with ANY e-commerce website
+    Scrape products using simple direct HTML parsing
     
-    🚀 **NEW FEATURES:**
-    - **Universal compatibility**: Works with Shopify, WooCommerce, Magento, BigCommerce, and any custom e-commerce site
-    - **Multiple extraction methods**: JSON-LD, JavaScript variables, meta tags, HTML parsing, browser rendering
-    - **Intelligent fallbacks**: If one method fails, automatically tries others
-    - **Enhanced pagination**: Automatically detects and follows pagination on collection pages
-    - **Smart URL detection**: Automatically identifies collection vs product pages
-    - **Improved data validation**: Ensures extracted data is meaningful and accurate
-    
-    📊 **Parameters:**
     - **urls**: List of URLs to scrape (collections or individual products)
     - **max_pages**: Maximum number of pages/products to scrape per URL (default: 20)
-    
-    🎯 **Supported Sites:**
-    - All Shopify stores (like alayacotton.com, deashaindia.com)
-    - All WooCommerce sites
-    - Magento stores
-    - BigCommerce stores
-    - Custom e-commerce websites
-    - Any website with product listings
-    
-    ⚡ **Performance:**
-    - Tries fast HTTP methods first, falls back to browser when needed
-    - Parallel product scraping for better speed
-    - Automatic retry logic with exponential backoff
-    - Real-time progress updates via WebSocket
     """
-    task_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+    task_id = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
     
-    logger.info(f"🚀 Starting ENHANCED UNIVERSAL scrape task {task_id} with {len(request.urls)} URLs")
+    logger.info(f"Starting simple scrape task {task_id} with {len(request.urls)} URLs")
     
-    # Store enhanced task info
+    # Store task info
     active_tasks[task_id] = {
         "task_id": task_id,
         "status": "started",
-        "scraper_type": "enhanced-universal",
+        "scraper_type": "simple",
         "start_time": datetime.now().isoformat(),
         "urls": [str(url) for url in request.urls],
         "max_pages": request.max_pages,
@@ -452,48 +331,26 @@ async def scrape_products(request: ScrapeRequest, background_tasks: BackgroundTa
         "error": None,
         "end_time": None,
         "processing_time": None,
-        "features": [
-            "Universal compatibility",
-            "Multiple extraction methods", 
-            "Intelligent fallbacks",
-            "Enhanced pagination",
-            "Smart URL detection",
-            "Data validation",
-            "Parallel processing",
-            "Real-time updates"
-        ],
         "current_progress": {
             "stage": "initializing",
             "percentage": 0,
-            "details": "🔧 Initializing enhanced universal scraper...",
+            "details": "Starting simple scraping...",
             "timestamp": datetime.now().isoformat()
         }
     }
     
-    # Start enhanced scraping in background
+    # Start scraping in background
     background_tasks.add_task(run_simple_scrape_task, task_id, [str(url) for url in request.urls], request.max_pages)
     
     return ScrapeResponse(
         success=True,
-        message=f"Enhanced universal scraping task started with ID: {task_id}",
+        message=f"Simple scraping task started with ID: {task_id}",
         data={
             "task_id": task_id,
             "status": "started",
-            "scraper_type": "enhanced-universal",
+            "scraper_type": "simple",
             "urls_count": len(request.urls),
-            "max_pages": request.max_pages,
-            "features": [
-                "Works with ANY e-commerce website",
-                "Multiple extraction methods with fallbacks",
-                "Enhanced pagination detection",
-                "Parallel product processing",
-                "Real-time WebSocket updates",
-                "Automatic data validation"
-            ],
-            "supported_platforms": [
-                "Shopify", "WooCommerce", "Magento", "BigCommerce", 
-                "Custom e-commerce sites", "Any product listing website"
-            ]
+            "max_pages": request.max_pages
         }
     )
 
@@ -1002,92 +859,66 @@ async def get_results(task_id: str):
         "products": task["result"]["products"]
     }
 
+
+# In api_deep.py, update the task function to handle collection responses
+
 async def run_simple_scrape_task(task_id: str, urls: List[str], max_pages: int):
-    """Enhanced simple scraping task with universal website support"""
+    """Run the universal scraping task with improved collection handling"""
     start_time = time.time()
     
     try:
         active_tasks[task_id]["status"] = "running"
         
-        async def progress_callback(progress_data):
+        async def progress_callback(percentage, details):
             if task_id in active_tasks:
                 active_tasks[task_id]["current_progress"] = {
-                    **progress_data,
+                    "stage": "scraping",
+                    "percentage": percentage,
+                    "details": details,
                     "timestamp": datetime.now().isoformat()
                 }
                 await manager.send_progress_update(task_id, {
                     "type": "progress_update",
-                    "data": progress_data
+                    "data": active_tasks[task_id]["current_progress"]
                 })
         
-        # Initialize enhanced scraper
-        scraper = SimpleProductScraper()
+        # Initialize universal scraper
+        scraper = UniversalEcommerceScraper()
         all_products = []
         
         for i, url in enumerate(urls):
             progress = 10 + (i * 70 // len(urls))
             domain = urlparse(url).netloc
-            await progress_callback({
-                "stage": "scraping",
-                "percentage": progress,
-                "details": f"Processing {domain} with enhanced universal method"
-            })
+            await progress_callback(progress, f"Processing {domain}")
             
-            # Check if it's a collection URL
-            if scraper.is_collection_url(url):
-                # Use enhanced collection scraping with pagination
-                await progress_callback({
-                    "stage": "collection_scraping",
-                    "percentage": progress + 5,
-                    "details": f"Scraping collection: {domain}"
-                })
-                
-                products = await scraper.scrape_collection_with_pagination(
-                    url, max_pages=max_pages, progress_callback=progress_callback
-                )
-                all_products.extend(products)
-                
-                logger.info(f"✅ Scraped {len(products)} products from collection: {url}")
+            # Use universal extraction for all URLs
+            result = await scraper.extract_product_data_universal(url)
             
-            else:
-                # Individual product - use enhanced hybrid extraction
-                await progress_callback({
-                    "stage": "product_scraping",
-                    "percentage": progress + 5,
-                    "details": f"Scraping individual product: {domain}"
-                })
-                
-                product_data = await scraper.extract_product_data_hybrid(url)
-                if product_data and scraper._is_valid_product_data(product_data):
-                    all_products.append(product_data)
-                    logger.info(f"✅ Scraped product: {product_data.get('product_name', 'Unknown')}")
-                else:
-                    logger.warning(f"⚠️ Failed to scrape product from: {url}")
-            
-            # Small delay to be respectful
-            await asyncio.sleep(0.5)
+            # Handle both single products and collections
+            if isinstance(result, dict) and "products" in result:
+                # This is a collection result
+                collection_products = result.get("products", [])
+                all_products.extend(collection_products)
+                self.log(f"Added {len(collection_products)} products from collection")
+            elif isinstance(result, dict) and "error" not in result:
+                # This is a single product
+                all_products.append(result)
+            elif isinstance(result, list):
+                # Multiple products
+                all_products.extend(result)
         
-        # Wrap in result structure
+        # Post-process the scraped data
+        await progress_callback(95, "Post-processing and fixing image URLs")
+        
         result = {
             "products": all_products,
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
                 "total_products": len(all_products),
-                "scraper_type": "enhanced-universal",
-                "urls_processed": len(urls),
-                "extraction_methods_used": list(set([
-                    p.get('extraction_method', 'unknown') for p in all_products if 'extraction_method' in p
-                ])),
-                "success_rate": round((len(all_products) / len(urls)) * 100, 2) if urls else 0
+                "scraper_type": "universal",
+                "urls_processed": len(urls)
             }
         }
-        
-        # Post-process the scraped data
-        await progress_callback({
-            "stage": "post_processing",
-            "percentage": 95,
-            "details": "🔧 Post-processing and fixing image URLs..."
-        })
         
         result = await post_process_scraped_data(result)
         
@@ -1109,12 +940,8 @@ async def run_simple_scrape_task(task_id: str, urls: List[str], max_pages: int):
             "data": active_tasks[task_id]
         })
         
-        logger.info(f"🎉 Enhanced scraping completed! Task: {task_id}, Products: {len(all_products)}")
-        
     except Exception as e:
-        logger.error(f"Enhanced scrape task {task_id} failed: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        
+        logger.error(f"Universal scrape task {task_id} failed: {e}")
         active_tasks[task_id].update({
             "status": "failed",
             "error": str(e),
@@ -1128,6 +955,7 @@ async def run_simple_scrape_task(task_id: str, urls: List[str], max_pages: int):
             "data": active_tasks[task_id]
         })
 
+        
 async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: int):
     """Run the AI scraping task in the background with enhanced progress tracking"""
     start_time = time.time()
@@ -1317,6 +1145,7 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
             "type": "task_failed",
             "data": active_tasks[task_id]
         })
+
 # In api.py, update the startup_event function
 @app.on_event("startup")
 async def startup_event():
@@ -1502,108 +1331,27 @@ async def get_active_tasks():
 class UrlRequest(BaseModel):
     base_url: str
 
-# @app.post("/api/get-domain-urls")
-# async def get_domain_urls(req: UrlRequest):
-#     try:
-#         base_url = req.base_url.strip()
-#         if not base_url.startswith(("http://", "https://")):
-#             base_url = "https://" + base_url
-
-#         headers = {"User-Agent": "Mozilla/5.0"}
-
-#         async with httpx.AsyncClient(
-#             timeout=httpx.Timeout(10.0, connect=5.0),
-#             verify=False,
-#             follow_redirects=True,
-#             headers=headers
-#         ) as client:
-#             resp = await client.get(base_url)
-            
-#             if resp.status_code >= 400:
-#                 raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
-
-#             tree = HTMLParser(resp.text)
-#             sublinks = set()
-#             for a in tree.css("a[href]"):
-#                 href = a.attributes.get("href")
-#                 if not href:
-#                     continue
-#                 full_url = urljoin(base_url, href)
-#                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
-#                     sublinks.add(full_url)
-
-#             sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
-
-#             semaphore = asyncio.Semaphore(5)
-#             async def fetch(url):
-#                 async with semaphore:
-#                     try:
-#                         return url, await client.get(url)
-#                     except Exception:
-#                         return url, None
-
-#             responses = await asyncio.gather(*[fetch(u) for u in sublinks])
-
-#             collections_with_products, product_urls, urls_array = [], set(), set()
-#             for url, res in responses:
-#                 if not res or res.status_code != 200:
-#                     continue
-#                 tree = HTMLParser(res.text)
-#                 product_links = [
-#                     urljoin(base_url, a.attributes.get("href"))
-#                     for a in tree.css("a[href*='/products/']")
-#                 ]
-#                 if product_links:
-#                     collections_with_products.append(url)
-#                     product_urls.update(product_links)
-#                 urls_array.add(url)
-
-#             return {
-#                 "success": True,
-#                 "base_url": base_url,
-#                 "collections_count": len(collections_with_products),
-#                 "collections_with_products": sorted(collections_with_products),
-#                 "total_products": len(product_urls),
-#                 "all_product_urls": sorted(product_urls),
-#                 "urls_array": sorted(urls_array)
-#             }
-
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
-
-async def fetch_html(client, url):
-    try:
-        resp = await client.get(url)
-        if resp.status_code == 200:
-            return resp.text
-    except Exception:
-        return None
-    return None
-
 @app.post("/api/get-domain-urls")
 async def get_domain_urls(req: UrlRequest):
     try:
         base_url = req.base_url.strip()
         if not base_url.startswith(("http://", "https://")):
-            base_url = "https://" + base_url  # default try https
+            base_url = "https://" + base_url
 
         headers = {"User-Agent": "Mozilla/5.0"}
 
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(15.0, connect=5.0),
+            timeout=httpx.Timeout(10.0, connect=5.0),
             verify=False,
             follow_redirects=True,
             headers=headers
         ) as client:
-            # Try HTTPS first, fallback to HTTP if fails
-            html = await fetch_html(client, base_url)
-            if not html and base_url.startswith("https://"):
-                base_url = base_url.replace("https://", "http://", 1)
-                html = await fetch_html(client, base_url)
-            if not html:
-                raise HTTPException(status_code=400, detail="Unable to fetch the site")
+            resp = await client.get(base_url)
+            
+            if resp.status_code >= 400:
+                raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
 
-            tree = HTMLParser(html)
+            tree = HTMLParser(resp.text)
             sublinks = set()
             for a in tree.css("a[href]"):
                 href = a.attributes.get("href")
@@ -1613,8 +1361,7 @@ async def get_domain_urls(req: UrlRequest):
                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
                     sublinks.add(full_url)
 
-            # limit crawling
-            sublinks = sorted(list(sublinks))
+            sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
 
             semaphore = asyncio.Semaphore(5)
             async def fetch(url):
@@ -1631,20 +1378,13 @@ async def get_domain_urls(req: UrlRequest):
                 if not res or res.status_code != 200:
                     continue
                 tree = HTMLParser(res.text)
-
-                # Detect Shopify (/products/) and WooCommerce (/product/)
                 product_links = [
                     urljoin(base_url, a.attributes.get("href"))
-                    for a in tree.css("a[href]")
-                    if a.attributes.get("href") and (
-                        "/products/" in a.attributes["href"] or "/product/" in a.attributes["href"]
-                    )
+                    for a in tree.css("a[href*='/products/']")
                 ]
-
                 if product_links:
                     collections_with_products.append(url)
                     product_urls.update(product_links)
-
                 urls_array.add(url)
 
             return {
@@ -1660,6 +1400,7 @@ async def get_domain_urls(req: UrlRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
 
+    
 async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30):
     """Clean up terminated tasks from memory after a delay"""
     try:
@@ -1672,83 +1413,6 @@ async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30)
                 
     except Exception as e:
         logger.error(f"Error cleaning up terminated tasks: {e}")
-
-class SaveUrlsRequest(BaseModel):
-    urls: List[str]
-
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
-TARGETS_FILE = os.path.join(DATA_DIR, "targets.json")
-
-@app.post("/api/save-urls")
-async def save_urls(req: SaveUrlsRequest):
-    """
-    Save textarea URLs to data/targets.json every time user clicks Grab Product.
-    Keeps history of all uploads instead of overwriting.
-    """
-    try:
-        urls = [u.strip() for u in req.urls if u and u.strip()]
-        if not urls:
-            raise HTTPException(status_code=400, detail="No valid URLs provided")
-
-        # Load existing data if file exists
-        if os.path.exists(TARGETS_FILE):
-            with open(TARGETS_FILE, "r", encoding="utf-8") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    data = []
-        else:
-            data = []
-
-        # Ensure file is a list
-        if not isinstance(data, list):
-            data = [data]
-
-        # Append new entry
-        entry = {
-            "timestamp": datetime.now().isoformat(),
-            "count": len(urls),
-            "urls": urls
-        }
-        data.append(entry)
-
-        # Save back
-        with open(TARGETS_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"✅ Appended {len(urls)} URLs into {TARGETS_FILE}")
-        return {"success": True, "count": len(urls), "total_entries": len(data), "file": TARGETS_FILE}
-
-    except Exception as e:
-        logger.error(f"❌ Failed to save URLs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/scrape/ai")
-async def scrape_ai(req: SaveUrlsRequest, background_tasks: BackgroundTasks):
-    """
-    Trigger scraping in background with provided URLs.
-    """
-    urls = [u.strip() for u in req.urls if u and u.strip()]
-    if not urls:
-        raise HTTPException(status_code=400, detail="No URLs provided")
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_file = LOGS_DIR / f"api_scrape_{timestamp}.json"
-
-    async def run_scraper():
-        try:
-            result = await scrape_urls_simple_api(urls, max_pages=50)
-            with open(out_file, "w", encoding="utf-8") as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-            logger.info(f"Scrape results written to {out_file}")
-        except Exception as e:
-            logger.exception(f"Scrape failed: {e}")
-
-    background_tasks.add_task(run_scraper)
-    return {"success": True, "msg": f"Scraping started, results will be in {out_file}"}
-
-
 
 if __name__ == "__main__":
     import uvicorn
