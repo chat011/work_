@@ -1,3 +1,4 @@
+import pathlib
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,7 +33,6 @@ import httpx
 from selectolax.parser import HTMLParser
 
 
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +47,9 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+LOGS_DIR = pathlib.Path("logs")
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
 
@@ -1581,6 +1584,83 @@ async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30)
                 
     except Exception as e:
         logger.error(f"Error cleaning up terminated tasks: {e}")
+
+class SaveUrlsRequest(BaseModel):
+    urls: List[str]
+
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+TARGETS_FILE = os.path.join(DATA_DIR, "targets.json")
+
+@app.post("/api/save-urls")
+async def save_urls(req: SaveUrlsRequest):
+    """
+    Save textarea URLs to data/targets.json every time user clicks Grab Product.
+    Keeps history of all uploads instead of overwriting.
+    """
+    try:
+        urls = [u.strip() for u in req.urls if u and u.strip()]
+        if not urls:
+            raise HTTPException(status_code=400, detail="No valid URLs provided")
+
+        # Load existing data if file exists
+        if os.path.exists(TARGETS_FILE):
+            with open(TARGETS_FILE, "r", encoding="utf-8") as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    data = []
+        else:
+            data = []
+
+        # Ensure file is a list
+        if not isinstance(data, list):
+            data = [data]
+
+        # Append new entry
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "count": len(urls),
+            "urls": urls
+        }
+        data.append(entry)
+
+        # Save back
+        with open(TARGETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"✅ Appended {len(urls)} URLs into {TARGETS_FILE}")
+        return {"success": True, "count": len(urls), "total_entries": len(data), "file": TARGETS_FILE}
+
+    except Exception as e:
+        logger.error(f"❌ Failed to save URLs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/scrape/ai")
+async def scrape_ai(req: SaveUrlsRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger scraping in background with provided URLs.
+    """
+    urls = [u.strip() for u in req.urls if u and u.strip()]
+    if not urls:
+        raise HTTPException(status_code=400, detail="No URLs provided")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_file = LOGS_DIR / f"api_scrape_{timestamp}.json"
+
+    async def run_scraper():
+        try:
+            result = await scrape_urls_simple_api(urls, max_pages=50)
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            logger.info(f"Scrape results written to {out_file}")
+        except Exception as e:
+            logger.exception(f"Scrape failed: {e}")
+
+    background_tasks.add_task(run_scraper)
+    return {"success": True, "msg": f"Scraping started, results will be in {out_file}"}
+
+
 
 if __name__ == "__main__":
     import uvicorn

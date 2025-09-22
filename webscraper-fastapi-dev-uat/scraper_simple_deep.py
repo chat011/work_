@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional, Callable
 from urllib.parse import urljoin, urlparse
 import re
 import tenacity
-import traceback
+import traceback2 as traceback
 
 from playwright.async_api import async_playwright
 from pydantic import HttpUrl
@@ -79,7 +79,42 @@ class SimpleProductScraper:
         self.progress_callback = progress_callback
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.universal_scraper = UniversalProductScraper()
-    
+        # ---------------- STOCK HELPERS ----------------
+    def _extract_stock_from_jsonld(self, offers: dict) -> Optional[str]:
+        """Extract stock availability from JSON-LD offers"""
+        availability = offers.get("availability")
+        if availability:
+            availability = str(availability).lower()
+            if "instock" in availability:
+                return "InStock"
+            if "outofstock" in availability:
+                return "OutOfStock"
+        return None
+
+    def _extract_stock_from_html(self, soup) -> Optional[str]:
+        """Extract stock info from HTML content"""
+        selectors = [".availability", ".stock", "[data-stock]", ".product-availability"]
+        for sel in selectors:
+            el = soup.select_one(sel)
+            if el:
+                text = el.get_text(strip=True).lower()
+                if "in stock" in text or "available" in text:
+                    return "InStock"
+                if "out of stock" in text or "unavailable" in text:
+                    return "OutOfStock"
+        return None
+
+    def _extract_stock_from_js(self, product_data: dict) -> Optional[str]:
+        """Extract stock availability from inline JS product data"""
+        for key in ["availability", "inStock", "stock", "is_available", "outOfStock"]:
+            if key in product_data:
+                val = str(product_data[key]).lower()
+                if val in ["true", "1", "yes", "instock", "available"]:
+                    return "InStock"
+                if val in ["false", "0", "no", "outofstock", "unavailable"]:
+                    return "OutOfStock"
+        return None
+
     def log(self, message: str, level: str = "INFO", details: Dict[str, Any] = None):
         """Enhanced logging"""
         timestamp = datetime.now().isoformat()
@@ -304,11 +339,160 @@ class SimpleProductScraper:
                         "product_images": self._extract_images_from_jsonld(data),
                         "description": data.get('description', ''),
                         "brand": data.get('brand', {}).get('name', '') if isinstance(data.get('brand'), dict) else str(data.get('brand', '')),
+                        "in_stock": self._extract_stock_from_jsonld(offers),
                     }
             except (json.JSONDecodeError, AttributeError):
                 continue
         
         return None
+    # Add this debug method to your SimpleProductScraper class to test specific URLs
+    async def debug_price_extraction_supercape(self, url: str):
+        """Debug price extraction for supercape.in specifically"""
+        print(f"\n🔍 DEBUGGING PRICE EXTRACTION FOR: {url}")
+        print("=" * 60)
+        
+        try:
+            # Method 1: Try with HTTP first
+            print("1. TRYING HTTP REQUEST...")
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.get(url, headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                })
+                
+                if response.status_code == 200:
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    print(f"   ✅ HTTP request successful ({len(response.text)} chars)")
+                    
+                    # Check if this is a collection page (which won't have prices)
+                    product_links = soup.find_all('a', href=re.compile(r'/product/'))
+                    if len(product_links) > 1:
+                        print(f"   ⚠️  THIS IS A COLLECTION PAGE with {len(product_links)} product links")
+                        print("   💡 Individual product URLs:")
+                        for i, link in enumerate(product_links[:3]):
+                            href = link.get('href', '')
+                            if href.startswith('/'):
+                                href = 'https://supercape.in' + href
+                            print(f"      {i+1}. {href}")
+                        print("   🎯 Try testing with one of these individual product URLs instead!")
+                        return
+                    
+                    # Test different price selectors
+                    print("   🔍 TESTING PRICE SELECTORS:")
+                    selectors_to_test = [
+                        '.price .woocommerce-Price-amount.amount bdi',
+                        '.woocommerce-Price-amount.amount bdi',
+                        '.price bdi',
+                        '.price .amount',
+                        '.price',
+                        '.woocommerce-price-amount',
+                        '[class*="price"]',
+                        '.amount'
+                    ]
+                    
+                    found_any = False
+                    for i, selector in enumerate(selectors_to_test, 1):
+                        elements = soup.select(selector)
+                        print(f"   {i}. {selector}: {len(elements)} elements")
+                        
+                        for j, element in enumerate(elements[:2]):
+                            text = element.get_text(strip=True)
+                            if text:
+                                print(f"      Element {j+1}: '{text}'")
+                                
+                                # Test price parsing
+                                price = self._parse_price_universal(text)
+                                if price > 0:
+                                    print(f"      ✅ PRICE EXTRACTED: {price}")
+                                    found_any = True
+                                else:
+                                    print(f"      ❌ Could not parse price from: '{text}'")
+                    
+                    if not found_any:
+                        print("   ❌ NO PRICES FOUND WITH SELECTORS")
+                        
+                        # Try regex search in full page text
+                        print("\n   🔍 TRYING REGEX SEARCH IN PAGE TEXT:")
+                        page_text = soup.get_text()
+                        
+                        patterns = [
+                            r'₹\s*([0-9,]+(?:\.[0-9]{2})?)',
+                            r'Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)',
+                            r'Price[:\s]*₹?\s*([0-9,]+(?:\.[0-9]{2})?)',
+                            r'(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:rs|rupees)',
+                        ]
+                        
+                        regex_found = False
+                        for pattern in patterns:
+                            matches = re.findall(pattern, page_text, re.IGNORECASE)
+                            if matches:
+                                print(f"   ✅ Found with pattern '{pattern}': {matches[:3]}")
+                                regex_found = True
+                                break
+                        
+                        if not regex_found:
+                            print("   ❌ NO PRICES FOUND WITH REGEX EITHER")
+                    
+                    # Show some of the HTML structure for analysis
+                    print(f"\n   📋 HTML STRUCTURE ANALYSIS:")
+                    price_divs = soup.find_all(['div', 'span'], class_=re.compile(r'price|amount|cost', re.I))
+                    print(f"   Found {len(price_divs)} price-related elements:")
+                    
+                    for i, div in enumerate(price_divs[:5]):
+                        classes = ' '.join(div.get('class', []))
+                        text = div.get_text(strip=True)[:100]
+                        print(f"   {i+1}. <{div.name} class='{classes}'>{text}</div>")
+                
+                else:
+                    print(f"   ❌ HTTP request failed: {response.status_code}")
+            
+            # Method 2: Try with browser (for JS-loaded content)
+            print(f"\n2. TRYING BROWSER-BASED EXTRACTION...")
+            try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True)
+                    page = await browser.new_page()
+                    
+                    await page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                    await asyncio.sleep(3)  # Wait for JS to load
+                    
+                    content = await page.content()
+                    await browser.close()
+                    
+                    soup_browser = BeautifulSoup(content, 'html.parser')
+                    print(f"   ✅ Browser content loaded ({len(content)} chars)")
+                    
+                    # Test if browser version has prices
+                    browser_price_elements = soup_browser.select('.price')
+                    print(f"   Found {len(browser_price_elements)} .price elements with browser")
+                    
+                    for i, elem in enumerate(browser_price_elements[:3]):
+                        text = elem.get_text(strip=True)
+                        print(f"   Browser price {i+1}: '{text}'")
+                        
+                        price = self._parse_price_universal(text)
+                        if price > 0:
+                            print(f"   ✅ BROWSER EXTRACTED PRICE: {price}")
+                            break
+                    
+            except Exception as e:
+                print(f"   ❌ Browser extraction failed: {e}")
+            
+            print(f"\n📊 SUMMARY:")
+            print(f"   - URL accessible via HTTP: ✅")
+            print(f"   - Contains price elements: {'✅' if found_any else '❌'}")
+            print(f"   - Price extraction working: {'✅' if found_any else '❌'}")
+            
+            if not found_any:
+                print(f"\n💡 RECOMMENDATIONS:")
+                print(f"   1. Make sure you're testing INDIVIDUAL PRODUCT URLs, not collection pages")
+                print(f"   2. The site might load prices with JavaScript - try browser extraction")
+                print(f"   3. Check if the site has anti-bot protection")
+                print(f"   4. Verify the HTML structure matches what we expect")
+            
+        except Exception as e:
+            print(f"❌ Debug failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _extract_images_from_jsonld(self, data: Dict[str, Any]) -> List[str]:
         """Extract images from JSON-LD data"""
@@ -466,7 +650,36 @@ class SimpleProductScraper:
             return result
         
         return None
-    
+    def _extract_price_from_nested_spans(self, soup: BeautifulSoup) -> float:
+        """Extract price from deeply nested span structures like WooCommerce"""
+        
+        # Method 1: Target WooCommerce nested structure specifically
+        # <span class="price"><span class="woocommerce-Price-amount amount"><bdi>₹549.00</bdi></span></span>
+        
+        woocommerce_selectors = [
+            '.price .woocommerce-Price-amount.amount bdi',  # Most specific first
+            '.woocommerce-Price-amount.amount bdi',
+            '.price .amount bdi',
+            '.price bdi'
+        ]
+        
+        for selector in woocommerce_selectors:
+            try:
+                elements = soup.select(selector)
+                for element in elements:
+                    # Get all text from bdi element (includes currency symbol + price)
+                    full_text = element.get_text(strip=True)  # Gets "₹549.00"
+                    
+                    if full_text:
+                        # Extract price using your existing universal parser
+                        price = self._parse_price_universal(full_text)
+                        if price > 0:
+                            return price
+            except:
+                continue
+        
+        return 0.0
+
     async def _extract_using_static_html(self, url: str) -> Optional[Dict[str, Any]]:
         """Extract from static HTML using universal selectors"""
         try:
@@ -483,7 +696,8 @@ class SimpleProductScraper:
                         "price": self._extract_price_universal(soup),
                         "product_images": self._extract_images_universal(soup, url),
                         "description": self._extract_description_universal(soup),
-                        "extraction_method": "static_html_parsing"
+                        "extraction_method": "static_html_parsing",
+                        "in_stock": self._extract_stock_from_html(soup),
                     }
         except Exception as e:
             self.log(f"Static HTML extraction failed: {e}", "DEBUG")
@@ -506,8 +720,19 @@ class SimpleProductScraper:
         
         return "Unknown Product"
     
+
+
+    # Update your existing _extract_price_universal method 
+    # (Find this method in your code and replace it with this version)
     def _extract_price_universal(self, soup: BeautifulSoup) -> float:
-        """Extract price using universal selectors"""
+        """Extract price using universal selectors with nested span support"""
+        
+        # FIRST: Try the new nested span extraction for WooCommerce sites
+        nested_price = self._extract_price_from_nested_spans(soup)
+        if nested_price > 0:
+            return nested_price
+        
+        # EXISTING: Continue with your original universal selectors
         for selector in self.universal_scraper.universal_selectors['price']:
             elements = soup.select(selector)
             for element in elements:
@@ -517,7 +742,6 @@ class SimpleProductScraper:
                     return price
         
         return 0.0
-
     def _parse_price_universal(self, price_text: str) -> float:
         """Universal price parser with improved logic"""
         if not price_text:
@@ -641,7 +865,9 @@ class SimpleProductScraper:
                         "price": self._extract_price_universal(soup),
                         "product_images": self._extract_images_universal(soup, url),
                         "description": self._extract_description_universal(soup),
-                        "extraction_method": f"browser_{timeout_seconds}s_timeout"
+                        "extraction_method": f"browser_{timeout_seconds}s_timeout",
+                        "in_stock": self._extract_stock_from_html(soup),
+
                     }
                     
                 finally:
@@ -681,7 +907,9 @@ class SimpleProductScraper:
                     "price": price,
                     "product_images": images,
                     "description": description,
-                    "extraction_method": "universal_fallback"
+                    "extraction_method": "universal_fallback",
+                    "in_stock": self._extract_stock_from_html(soup),
+
                 }
                 
         except Exception as e:
@@ -1156,23 +1384,59 @@ class SimpleProductScraper:
         
         return False
 
-    async def extract_collection_links(self, collection_url: str) -> List[str]:
-        """Enhanced extraction of product links from collection pages"""
-        try:
-            self.log(f"Extracting product links from: {collection_url}")
-            
-            # Try HTTP first (faster for many sites)
-            links = await self._extract_links_http(collection_url)
-            if links and len(links) >= 5:  # If we got decent results, use them
-                return links
-            
-            # Fallback to browser-based extraction
-            return await self._extract_links_browser(collection_url)
-                
-        except Exception as e:
-            self.log(f"Error extracting collection links from {collection_url}: {e}", "ERROR")
-            return []
+    async def extract_collection_links(self, url: str, max_pages: int = 20) -> List[str]:
+        """
+        Extract product links from a collection/category page.
+        Supports pagination up to `max_pages`.
+        """
+        product_links = []
+        seen = set()
 
+        try:
+            for page in range(1, max_pages + 1):
+                page_url = url
+                if page > 1:
+                    # Common pagination patterns: ?page=2 or /page/2/
+                    if "?" in url:
+                        page_url = f"{url}&page={page}"
+                    else:
+                        page_url = f"{url}?page={page}"
+
+                self.log(f"Fetching collection page: {page_url}")
+
+                async with httpx.AsyncClient(timeout=15) as client:
+                    response = await client.get(page_url, headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+                    })
+
+                if response.status_code != 200:
+                    self.log(f"Page {page} returned status {response.status_code}, stopping pagination", "WARNING")
+                    break
+
+                soup = BeautifulSoup(response.text, "html.parser")
+
+                # Extract product links using universal selectors
+                for selector in self.universal_scraper.universal_selectors['product_links']:
+                    for a in soup.select(selector):
+                        href = a.get("href")
+                        if href:
+                            # Normalize link
+                            if href.startswith("/"):
+                                href = urljoin(url, href)
+                            if href.startswith("http") and href not in seen:
+                                seen.add(href)
+                                product_links.append(href)
+
+                # Stop if no new links were found on this page
+                if len(product_links) == len(seen):
+                    self.log(f"No new products found on page {page}, stopping pagination", "INFO")
+                    break
+
+        except Exception as e:
+            self.log(f"Error while extracting collection links: {e}", "ERROR")
+
+        return product_links
+    
     async def _extract_links_http(self, collection_url: str) -> List[str]:
         """Extract product links using HTTP requests"""
         try:
@@ -1467,45 +1731,61 @@ class SimpleProductScraper:
 
 # Enhanced API function
 async def scrape_urls_simple_api(
-    urls: List[str], 
+    urls: List[str],
     log_callback: Optional[Callable] = None,
     progress_callback: Optional[Callable] = None,
     max_pages: int = 20
 ) -> Dict[str, Any]:
     """
-    Enhanced Simple API function to scrape product data from ANY e-commerce website
+    Enhanced Simple API function to scrape ALL product data from ANY e-commerce website
+    - Handles full pagination
+    - Deduplicates product URLs
+    - Ensures stock details are included
     """
     scraper = SimpleProductScraper(log_callback, progress_callback)
-    
+
     try:
         scraper.log("Starting enhanced universal scraping process")
         scraper.update_progress("initialization", 5, "Setting up universal scraper")
-        
+
         all_products = []
+        seen_urls = set()
         total_pages_scraped = 0
-        
+
         for i, url in enumerate(urls):
-            scraper.update_progress("analyzing_urls", 10 + (i * 10), f"Processing URL {i+1}/{len(urls)}")
-            
-            # Check if it's a collection or individual product
+            scraper.update_progress("analyzing_urls", 10 + (i * 5), f"Processing URL {i+1}/{len(urls)}")
+
             if scraper.is_collection_url(url):
-                # Collection page - extract product links with enhanced pagination
                 scraper.log(f"Detected collection page: {url}")
-                products = await scraper.scrape_collection_with_pagination(url, max_pages, progress_callback)
-                all_products.extend(products)
-                total_pages_scraped += len(products)
+
+                # ✅ Extract all product links across pages
+                product_links = await scraper.extract_collection_links(url, max_pages=max_pages)
+
+                scraper.log(f"Found {len(product_links)} product links in collection {url}")
+
+                for link in product_links:
+                    if link not in seen_urls:
+                        seen_urls.add(link)
+                        data = await scraper.extract_product_data_hybrid(link)
+                        if data and scraper._is_valid_product_data(data):
+                            data["source_url"] = link 
+                            all_products.append(data)
+                            total_pages_scraped += 1
+
             else:
-                # Individual product page - use enhanced hybrid extraction
-                scraper.update_progress("scraping_products", 50, f"Scraping individual product")
-                product_data = await scraper.extract_product_data_hybrid(url)
-                if product_data and scraper._is_valid_product_data(product_data):
-                    all_products.append(product_data)
-                total_pages_scraped += 1
-        
-        scraper.update_progress("completed", 100, f"Completed! Found {len(all_products)} products")
+                # ✅ Direct product page
+                if url not in seen_urls:
+                    seen_urls.add(url)
+                    scraper.update_progress("scraping_products", 50, f"Scraping product {url}")
+                    data = await scraper.extract_product_data_hybrid(url)
+                    if data and scraper._is_valid_product_data(data):
+                        all_products.append(data)
+                        total_pages_scraped += 1
+
+        scraper.update_progress("completed", 100, f"Completed! Found {len(all_products)} unique products")
         scraper.log("Enhanced universal scraping completed successfully", "SUCCESS")
-        
-        # Save results
+
+        # ✅ Final result with metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         result = {
             "metadata": {
@@ -1514,23 +1794,22 @@ async def scrape_urls_simple_api(
                 "total_pages_scraped": total_pages_scraped,
                 "scraper_type": "enhanced-universal",
                 "urls_processed": len(urls),
+                "unique_urls": len(seen_urls),
                 "success_rate": round((len(all_products) / max(total_pages_scraped, 1)) * 100, 2)
             },
             "products": all_products
         }
-        
-        # Save to logs directory
+
+        # Save results into logs
         logs_dir = "logs"
         os.makedirs(logs_dir, exist_ok=True)
-        
         output_file = os.path.join(logs_dir, f"enhanced_scrape_{timestamp}.json")
-        with open(output_file, 'w', encoding='utf-8') as f:
+        with open(output_file, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
-        
+
         scraper.log(f"Results saved to {output_file}")
-        
         return result
-        
+
     except Exception as e:
         scraper.log(f"Error in enhanced universal scraping: {e}", "ERROR")
         scraper.log(f"Traceback: {traceback.format_exc()}", "ERROR")

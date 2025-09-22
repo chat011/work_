@@ -263,76 +263,91 @@ class FashionScraper {
     }
 
     async startScraping() {
-        const urls = this.urlInput.value.trim();
-        if (!urls) {
-            this.addMessage('⚠️ Please enter at least one URL to scrape.', 'error');
-            return;
-        }
-
-        const urlList = urls.split('\n').filter(url => url.trim()).map(url => url.trim());
-        if (urlList.length === 0) {
-            this.addMessage('⚠️ Please enter valid URLs.', 'error');
-            return;
-        }
-
-        // Get settings
-        const maxPages = parseInt(this.maxPages.value) || 50;
-        const useAiPagination = this.aiPagination.checked;
-        const aiExtractionMode = this.aiExtraction.checked;
-
-        // Clear previous results and start fresh
-        this.clearResults();
-        this.isScrapingActive = true;
-        this.scrapeBtn.textContent = 'AI Processing...';
-        this.scrapeBtn.disabled = true;
-
-        try {
-            // Start scraping
-            const response = await fetch('/scrape/ai', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    urls: urlList,
-                    max_pages_per_url: maxPages,
-                    use_ai_pagination: useAiPagination,
-                    ai_extraction_mode: aiExtractionMode
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            if (result.success) {
-                this.currentTaskId = result.data.task_id;
-                this.addMessage(`
-                            <div class="task-started-compact">
-                                <span class="status-icon">✅</span>
-                                <span class="status-text">Task started</span>
-                                <span class="task-id-container">
-                                    <span class="task-id-label">ID:</span>
-                                    <code class="task-id-code" onclick="navigator.clipboard.writeText('${this.currentTaskId}'); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000)" title="Click to copy">${this.currentTaskId}</code>
-                                </span>
-                            </div>
-                        `, 'success');
-
-                // Start monitoring progress with WebSocket
-                await this.monitorProgress();
-
-            } else {
-                throw new Error(result.error || 'Unknown error occurred');
-            }
-
-        } catch (error) {
-            console.error('Error starting scraping:', error);
-            this.addMessage(`❌ <strong>Failed to start scraping:</strong> ${error.message}`, 'error');
-            this.resetScrapingState();
-        }
+    const urls = this.urlInput.value.trim();
+    if (!urls) {
+        this.addMessage('⚠️ Please enter at least one URL to scrape.', 'error');
+        return;
     }
+
+    const urlList = urls.split('\n').filter(url => url.trim()).map(url => url.trim());
+    if (urlList.length === 0) {
+        this.addMessage('⚠️ Please enter valid URLs.', 'error');
+        return;
+    }
+
+    // Get settings
+    const maxPages = parseInt(this.maxPages.value) || 50;
+    const useAiPagination = this.aiPagination.checked;
+    const aiExtractionMode = this.aiExtraction.checked;
+
+    // Clear previous results and start fresh
+    this.clearResults();
+    this.isScrapingActive = true;
+    this.scrapeBtn.textContent = 'AI Processing...';
+    this.scrapeBtn.disabled = true;
+
+    try {
+        // ✅ Step 1: Save URLs to backend file for cron usage
+        const saveResp = await fetch('/api/save-urls', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: urlList })
+        });
+        if (!saveResp.ok) {
+            throw new Error(`Failed to save URLs (status: ${saveResp.status})`);
+        }
+        const saveData = await saveResp.json();
+        console.log("URLs saved:", saveData);
+
+        // ✅ Step 2: Start scraping task (old flow preserved)
+        const response = await fetch('/scrape/ai', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                urls: urlList,
+                max_pages_per_url: maxPages,
+                use_ai_pagination: useAiPagination,
+                ai_extraction_mode: aiExtractionMode
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            this.currentTaskId = result.data.task_id;
+            this.addMessage(`
+                <div class="task-started-compact">
+                    <span class="status-icon">✅</span>
+                    <span class="status-text">Task started</span>
+                    <span class="task-id-container">
+                        <span class="task-id-label">ID:</span>
+                        <code class="task-id-code"
+                              onclick="navigator.clipboard.writeText('${this.currentTaskId}'); this.classList.add('copied'); setTimeout(() => this.classList.remove('copied'), 2000)"
+                              title="Click to copy">${this.currentTaskId}</code>
+                    </span>
+                </div>
+            `, 'success');
+
+            // Start monitoring progress with WebSocket
+            await this.monitorProgress();
+
+        } else {
+            throw new Error(result.error || 'Unknown error occurred');
+        }
+
+    } catch (error) {
+        console.error('Error starting scraping:', error);
+        this.addMessage(`❌ <strong>Failed to start scraping:</strong> ${error.message}`, 'error');
+        this.resetScrapingState();
+    }
+}
+
 
     setupNotifications() {
         if ('Notification' in window) {

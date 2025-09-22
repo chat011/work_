@@ -32,7 +32,6 @@ import httpx
 from selectolax.parser import HTMLParser
 
 
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -47,6 +46,13 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+DATA_DIR = pathlib.Path("data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+TARGETS_FILE = DATA_DIR / "targets.json"
+
+LOGS_DIR = pathlib.Path("logs")
+LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="./static/"), name="static")
 
@@ -1581,6 +1587,62 @@ async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30)
                 
     except Exception as e:
         logger.error(f"Error cleaning up terminated tasks: {e}")
+
+class SaveUrlsRequest(BaseModel):
+    urls: List[str]
+
+
+# ----------------------------------------------------
+# Routes
+# ----------------------------------------------------
+@app.post("/api/save-urls")
+async def save_urls(req: SaveUrlsRequest):
+    """
+    Save the list of URLs to data/targets.json.
+    """
+    try:
+        urls = [u.strip() for u in req.urls if u and u.strip()]
+        timestamp = datetime.now().isoformat()
+        payload = {
+            "timestamp": timestamp,
+            "count": len(urls),
+            "urls": urls,
+        }
+        with open(TARGETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Saved {len(urls)} urls to {TARGETS_FILE}")
+        return {"success": True, "saved_to": str(TARGETS_FILE), "count": len(urls)}
+    except Exception as e:
+        logger.error(f"Error saving urls: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/scrape/ai")
+async def scrape_ai(req: SaveUrlsRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger scraping in background with provided URLs.
+    """
+    urls = [u.strip() for u in req.urls if u and u.strip()]
+    if not urls:
+        raise HTTPException(status_code=400, detail="No URLs provided")
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_file = LOGS_DIR / f"api_scrape_{timestamp}.json"
+
+    async def run_scraper():
+        try:
+            result = await scrape_urls_simple_api(urls, max_pages=50)
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2, ensure_ascii=False)
+            logger.info(f"Scrape results written to {out_file}")
+        except Exception as e:
+            logger.exception(f"Scrape failed: {e}")
+
+    background_tasks.add_task(run_scraper)
+    return {"success": True, "msg": f"Scraping started, results will be in {out_file}"}
+
+
 
 if __name__ == "__main__":
     import uvicorn
