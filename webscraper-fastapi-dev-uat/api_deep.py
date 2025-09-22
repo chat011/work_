@@ -30,7 +30,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 import httpx
 from selectolax.parser import HTMLParser
-
+from playwright.async_api import async_playwright
 
 
 # Configure logging
@@ -1329,27 +1329,108 @@ async def get_active_tasks():
 class UrlRequest(BaseModel):
     base_url: str
 
+# @app.post("/api/get-domain-urls")
+# async def get_domain_urls(req: UrlRequest):
+#     try:
+#         base_url = req.base_url.strip()
+#         if not base_url.startswith(("http://", "https://")):
+#             base_url = "https://" + base_url
+
+#         headers = {"User-Agent": "Mozilla/5.0"}
+
+#         async with httpx.AsyncClient(
+#             timeout=httpx.Timeout(10.0, connect=5.0),
+#             verify=False,
+#             follow_redirects=True,
+#             headers=headers
+#         ) as client:
+#             resp = await client.get(base_url)
+            
+#             if resp.status_code >= 400:
+#                 raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
+
+#             tree = HTMLParser(resp.text)
+#             sublinks = set()
+#             for a in tree.css("a[href]"):
+#                 href = a.attributes.get("href")
+#                 if not href:
+#                     continue
+#                 full_url = urljoin(base_url, href)
+#                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
+#                     sublinks.add(full_url)
+
+#             sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
+
+#             semaphore = asyncio.Semaphore(5)
+#             async def fetch(url):
+#                 async with semaphore:
+#                     try:
+#                         return url, await client.get(url)
+#                     except Exception:
+#                         return url, None
+
+#             responses = await asyncio.gather(*[fetch(u) for u in sublinks])
+
+#             collections_with_products, product_urls, urls_array = [], set(), set()
+#             for url, res in responses:
+#                 if not res or res.status_code != 200:
+#                     continue
+#                 tree = HTMLParser(res.text)
+#                 product_links = [
+#                     urljoin(base_url, a.attributes.get("href"))
+#                     for a in tree.css("a[href*='/products/']")
+#                 ]
+#                 if product_links:
+#                     collections_with_products.append(url)
+#                     product_urls.update(product_links)
+#                 urls_array.add(url)
+
+#             return {
+#                 "success": True,
+#                 "base_url": base_url,
+#                 "collections_count": len(collections_with_products),
+#                 "collections_with_products": sorted(collections_with_products),
+#                 "total_products": len(product_urls),
+#                 "all_product_urls": sorted(product_urls),
+#                 "urls_array": sorted(urls_array)
+#             }
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
+
+async def fetch_html(client, url):
+    try:
+        resp = await client.get(url)
+        if resp.status_code == 200:
+            return resp.text
+    except Exception:
+        return None
+    return None
+
 @app.post("/api/get-domain-urls")
 async def get_domain_urls(req: UrlRequest):
     try:
         base_url = req.base_url.strip()
         if not base_url.startswith(("http://", "https://")):
-            base_url = "https://" + base_url
+            base_url = "https://" + base_url  # default try https
 
         headers = {"User-Agent": "Mozilla/5.0"}
 
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0, connect=5.0),
+            timeout=httpx.Timeout(15.0, connect=5.0),
             verify=False,
             follow_redirects=True,
             headers=headers
         ) as client:
-            resp = await client.get(base_url)
-            
-            if resp.status_code >= 400:
-                raise HTTPException(status_code=400, detail=f"Unable to fetch (status {resp.status_code})")
+            # Try HTTPS first, fallback to HTTP if fails
+            html = await fetch_html(client, base_url)
+            if not html and base_url.startswith("https://"):
+                base_url = base_url.replace("https://", "http://", 1)
+                html = await fetch_html(client, base_url)
+            if not html:
+                raise HTTPException(status_code=400, detail="Unable to fetch the site")
 
-            tree = HTMLParser(resp.text)
+            tree = HTMLParser(html)
             sublinks = set()
             for a in tree.css("a[href]"):
                 href = a.attributes.get("href")
@@ -1359,7 +1440,8 @@ async def get_domain_urls(req: UrlRequest):
                 if urlparse(full_url).netloc == urlparse(base_url).netloc:
                     sublinks.add(full_url)
 
-            sublinks = sorted(list(sublinks)) # smaller MAX_LINKS
+            # limit crawling
+            sublinks = sorted(list(sublinks))
 
             semaphore = asyncio.Semaphore(5)
             async def fetch(url):
@@ -1376,13 +1458,20 @@ async def get_domain_urls(req: UrlRequest):
                 if not res or res.status_code != 200:
                     continue
                 tree = HTMLParser(res.text)
+
+                # Detect Shopify (/products/) and WooCommerce (/product/)
                 product_links = [
                     urljoin(base_url, a.attributes.get("href"))
-                    for a in tree.css("a[href*='/products/']")
+                    for a in tree.css("a[href]")
+                    if a.attributes.get("href") and (
+                        "/products/" in a.attributes["href"] or "/product/" in a.attributes["href"]
+                    )
                 ]
+
                 if product_links:
                     collections_with_products.append(url)
                     product_urls.update(product_links)
+
                 urls_array.add(url)
 
             return {
@@ -1398,7 +1487,6 @@ async def get_domain_urls(req: UrlRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error scraping: {str(e)}")
 
-    
 async def cleanup_terminated_tasks(task_ids: List[str], delay_seconds: int = 30):
     """Clean up terminated tasks from memory after a delay"""
     try:

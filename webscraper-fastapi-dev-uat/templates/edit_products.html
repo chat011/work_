@@ -202,7 +202,7 @@
 
         .editable-table tr:hover td {
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            transform: scale(1.001);
+            /* transform: scale(1.001); */
         }
 
         .editable-table tr:nth-child(even) td {
@@ -734,13 +734,13 @@
 
         .dropdown-toggle {
             width: 100%;
-            min-height: 32px;
+            /* min-height: 32px;
             padding: 6px 8px;
             background: #f8fafc;
             border: 1px solid #e2e8f0;
-            border-radius: 6px;
+            border-radius: 6px; */
             cursor: pointer;
-            font-size: 0.75rem;
+            /* font-size: 0.75rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -749,7 +749,7 @@
             font-weight: 500;
             text-overflow: ellipsis;
             overflow: hidden;
-            white-space: nowrap;
+            white-space: nowrap; */
         }
 
         .dropdown-toggle:hover {
@@ -767,7 +767,7 @@
         .dropdown-toggle .selected-text {
             flex: 1;
             text-align: left;
-            white-space: nowrap;
+            /* white-space: nowrap; */
             overflow: hidden;
             text-overflow: ellipsis;
             color: inherit;
@@ -791,6 +791,8 @@
         }
 
            .dropdown-menu {
+            width: 100%;
+            display: none;
             position: absolute;
             top: calc(100% + 4px);
             left: 0;
@@ -800,7 +802,7 @@
             border-radius: 8px;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             z-index: 1000;
-            min-width: 200px;
+            /* min-width: 200px; */
             max-width: 350px;
             transition: opacity 0.2s ease, transform 0.2s ease;
             animation: dropdownFadeIn 0.2s ease;
@@ -894,7 +896,7 @@
         .dropdown-item:hover {
             background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
             color: var(--accent-purple);
-            padding-left: 16px;
+            /* padding-left: 16px; */
         }
 
         .dropdown-item.selected {
@@ -917,7 +919,7 @@
 
 .dropdown-backdrop {
     display: none;
-    position: fixed;
+    /* position: fixed; */
     top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(255,255,255,0.7);
     backdrop-filter: blur(3px);
@@ -944,7 +946,7 @@
 
         .dropdown-item:hover .color-box {
             border-color: var(--accent-purple);
-            transform: scale(1.1);
+            /* transform: scale(1.1); */
         }
 
         .dropdown-item.selected .color-box {
@@ -2031,7 +2033,7 @@ function removeDesktopBackdrop() {
     return `
         <div class="dropdown-container" id="${dropdownId}">
             <button class="dropdown-toggle ${hasSelection ? 'has-selection' : ''}" 
-                    onclick="event.stopPropagation(); productEditor.toggleDropdown('${dropdownId}', event)" 
+                    onclick="event.stopPropagation(); toggleDropdown('${dropdownId}', event)" 
                     type="button" title="${hasSelection ? displayText : placeholder}">
                 <span class="selected-text ${!hasSelection ? 'placeholder' : ''}">${displayText}</span>
                 <i class="fas fa-chevron-down"></i>
