@@ -581,67 +581,12 @@ class FashionScraper {
         this.connectWebSocket(this.currentTaskId);
     }
 
-
 displayResults(result) {
     const products = result.products || [];
-    const metadata = result.metadata || {}
+    const metadata = result.metadata || {};
 
-// Add CSS for better visual feedback
-const additionalCSS = `
-.product-card.selected {
-    border: 2px solid #8B5CF6;
-    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
-    transform: translateY(-2px);
-}
-
-.product-card.selected .product-select-overlay {
-    background: rgba(139, 92, 246, 0.1);
-}
-
-.btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.products-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-#editUploadBtn {
-    background: linear-gradient(135deg, #10B981, #059669);
-    color: white;
-    transition: all 0.3s ease;
-}
-
-#editUploadBtn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-}
-
-.pulse-animation {
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
-}
-`;
-
-// Inject additional CSS if not already present
-if (!document.getElementById('additional-product-styles')) {
-    const styleElement = document.createElement('style');
-    styleElement.id = 'additional-product-styles';
-    styleElement.textContent = additionalCSS;
-    document.head.appendChild(styleElement);
-};
-
-    // Add stats container
-    this.addMessage(`
+    // Add stats container at the top
+    const statsHtml = `
         <div class="stats-container">
             <div class="stat-card">
                 <div class="stat-number">${products.length}</div>
@@ -660,41 +605,150 @@ if (!document.getElementById('additional-product-styles')) {
                 <div class="stat-label">Pages Processed</div>
             </div>
         </div>
-    `, 'success');
+    `;
 
-    if (products.length > 0) {
-        // Store products for later use
-        this.currentProducts = products;
+    // Insert stats
+    this.addMessage(statsHtml, "success");
 
-        const productsHtml = `
-            <div class="products-header">
-                <div class="products-actions">
-                    <button id="selectAllBtn" class="btn btn-secondary">
-                        <i class="fas fa-check-square"></i> Select All
-                    </button>
-                    <button id="editUploadBtn" class="btn btn-primary" style="display: none;">
-                        <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
-                    </button>
-                </div>
-            </div>
-            <div class="products-grid" id="productsGrid">
-                ${products.map((product, index) => this.createProductCard(product, index)).join('')}
-            </div>
-        `;
-
-        this.addMessage(`
-            <strong>🛏️ Extracted Products (${products.length})</strong>
-            ${productsHtml}
-        `, 'system');
-
-        // Setup event listeners after DOM is inserted
-        setTimeout(() => {
-            this.setupProductEventListeners();
-        }, 100);
-
-    } else {
-        this.addMessage('ℹ️ No products were found in the provided URLs.', 'system');
+    // If no products, show message
+    if (products.length === 0) {
+        this.addMessage("ℹ️ No products were found in the provided URLs.", "system");
+        return;
     }
+
+    this.currentProducts = products;
+
+    // Build products section directly (NOT inside addMessage)
+    const productsSection = document.createElement("div");
+    productsSection.className = "products-section"; // Add a class for the entire section
+    
+    productsSection.innerHTML = `
+        <div class="products-header">
+            <div class="products-actions">
+                <button id="selectAllBtn" class="btn btn-secondary">
+                    <i class="fas fa-check-square"></i> Select All
+                </button>
+                <button id="editUploadBtn" class="btn btn-primary" style="display: none;">
+                    <i class="fas fa-edit"></i> Edit & Upload (<span id="selectedCount">0</span>)
+                </button>
+            </div>
+        </div>
+        <h3 style="margin: 15px 0;">🛍️ Extracted Products (${products.length})</h3>
+        <div class="products-grid" id="productsGrid">
+            ${products.map((product, index) => this.createProductCard(product, index)).join("")}
+        </div>
+    `;
+
+    this.chatMessages.appendChild(productsSection);
+
+    // Setup listeners - NO STYLING CODE HERE
+    setTimeout(() => {
+        this.setupProductEventListeners();
+        
+        // Ensure grid properties are set correctly and remove any conflicting inline styles
+        const grid = document.getElementById("productsGrid");
+        if (grid) {
+            // Remove any inline styles that might interfere with CSS grid
+            grid.removeAttribute('style');
+            
+            // Force CSS grid properties if needed
+            grid.style.removeProperty('display'); // Let CSS handle it
+            
+            // Debug: Log the current state
+            console.log('Products grid setup:', {
+                element: grid,
+                computedStyle: window.getComputedStyle(grid).display,
+                childrenCount: grid.children.length
+            });
+        }
+    }, 100);
+}
+
+
+
+// Add this method to your FashionScraper class
+ensureGridLayout() {
+    const grid = document.getElementById("productsGrid");
+    if (!grid) {
+        console.error("Products grid not found");
+        return;
+    }
+
+    // Remove any conflicting inline styles
+    grid.removeAttribute('style');
+    
+    // Force grid layout
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    grid.style.gap = '16px';
+    grid.style.marginTop = '16px';
+    grid.style.width = '100%';
+    
+    // Remove any flexbox properties that might have been added
+    grid.style.flexDirection = '';
+    grid.style.flexWrap = '';
+    grid.style.justifyContent = '';
+    grid.style.alignItems = '';
+    
+    console.log('Grid layout enforced:', {
+        display: grid.style.display,
+        gridTemplateColumns: grid.style.gridTemplateColumns,
+        childrenCount: grid.children.length
+    });
+}
+
+// Update your setupProductEventListeners method to include this:
+setupProductEventListeners() {
+    console.log('🔧 Setting up product event listeners...');
+    
+    // Ensure proper grid layout first
+    this.ensureGridLayout();
+    
+    // Select All button
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Select All button clicked');
+            this.selectAllProducts();
+        });
+        console.log('✅ Select All button listener attached');
+    } else {
+        console.error('❌ selectAllBtn not found in DOM');
+    }
+
+    // Edit & Upload button  
+    const editUploadBtn = document.getElementById('editUploadBtn');
+    if (editUploadBtn) {
+        editUploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Edit & Upload button clicked');
+            this.editSelectedProducts();
+        });
+        console.log('✅ Edit & Upload button listener attached');
+    } else {
+        console.error('❌ editUploadBtn not found in DOM');
+    }
+
+    // Product checkboxes with event delegation
+    const productsGrid = document.getElementById('productsGrid');
+    if (productsGrid) {
+        productsGrid.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('product-checkbox')) {
+                console.log(`✅ Checkbox ${e.target.id} changed to: ${e.target.checked}`);
+                this.handleProductSelection();
+            }
+        });
+        console.log('✅ Product grid change listener attached');
+    } else {
+        console.error('❌ productsGrid not found in DOM');
+    }
+
+    // Initialize selection state
+    this.handleProductSelection();
+    console.log('🎉 All event listeners setup complete');
 }
 setupProductEventListeners() {
     console.log('🔧 Setting up product event listeners...');
@@ -747,6 +801,7 @@ setupProductEventListeners() {
 }
     // UPDATED: Remove inline onclick handlers from createProductCard
 createProductCard(product, index) {
+    console.log('product price:',product)
     const price = product.price && product.price > 0 
         ? `₹${product.price.toLocaleString()}` 
         : 'Price not available';
@@ -756,11 +811,11 @@ createProductCard(product, index) {
         : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
 
     const sizes = product.sizes && product.sizes.length > 0
-        ? product.sizes.slice(0, 5).map(size => `<span class="tag">${size}</span>`).join('')
+        ? product.sizes.slice(0, 3).map(size => `<span class="tag">${size}</span>`).join('')
         : '';
 
     const colors = product.colors && product.colors.length > 0
-        ? product.colors.slice(0, 3).map(color => `<span class="tag">${color}</span>`).join('')
+        ? product.colors.slice(0, 2).map(color => `<span class="tag">${color}</span>`).join('')
         : '';
 
     const material = product.material ? `<span class="tag">${product.material}</span>` : '';
@@ -773,13 +828,12 @@ createProductCard(product, index) {
                     <i class="fas fa-check"></i>
                 </label>
             </div>
-            <img src="${image}" alt="${product.product_name}" class="product-image" 
-                 onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
+            <img src="${image}" alt="${product.product_name}" class="product-image">
             <div class="product-info">
                 <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
                 <div class="product-price">${price}</div>
                 <div class="product-details">
-                    ${product.description ? product.description.substring(0, 100) + '...' : 'No description available'}
+                    ${product.description ? product.description.substring(0, 100) + (product.description.length > 100 ? '...' : '') : 'No description available'}
                 </div>
                 <div class="product-tags">
                     ${sizes}
@@ -789,7 +843,7 @@ createProductCard(product, index) {
             </div>
         </div>
     `;
-    }
+}
 
     resetScrapingState() {
         this.isScrapingActive = false;

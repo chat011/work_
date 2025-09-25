@@ -155,11 +155,11 @@ class SimpleProductScraper:
 
     async def extract_product_data_hybrid(self, url: str) -> Dict[str, Any]:
         """
-        ENHANCED Universal hybrid method that works for ALL e-commerce sites
-        Tries multiple approaches in order of speed and reliability
-        """
+            ENHANCED Universal hybrid method that works for ALL e-commerce sites
+            Tries multiple approaches in order of speed and reliability
+            """
+            
         
-        # Try methods in order of reliability and speed
         methods = [
             ("platform_api", self._extract_using_platform_api),
             ("structured_data", self._extract_using_structured_data), 
@@ -167,6 +167,7 @@ class SimpleProductScraper:
             ("browser_fast", lambda u: self._extract_using_browser(u, 10)),
             ("browser_medium", lambda u: self._extract_using_browser(u, 15)),
             ("browser_slow", lambda u: self._extract_using_browser(u, 25)),
+            ("browser_extended", lambda u: self._extract_using_browser_extended(u)),  # New extended method
             ("universal_fallback", self._extract_universal_fallback)
         ]
         
@@ -175,34 +176,79 @@ class SimpleProductScraper:
                 self.log(f"Trying extraction method: {method_name} for {url}")
                 result = await method(url)
                 
-                # Validate result quality
+                # Validate result quality - if price is 0, try next method
                 if result and self._is_valid_product_data(result):
-                    result["extraction_method"] = method_name
-                    self.log(f"✅ Success with method: {method_name}")
-                    return result
-                else:
-                    self.log(f"Method {method_name} returned invalid data", "DEBUG")
+                    price = result.get("price", 0)
                     
+                    # If price is 0 but other data is valid, log it but don't reject immediately
+                    if price <= 0:
+                        self.log(f"Method {method_name} returned valid data but price=0, continuing...", "DEBUG")
+                        # Don't return yet - try next methods for better price extraction
+                    else:
+                        result["extraction_method"] = method_name
+                        self.log(f"✅ Success with method: {method_name}, price: {price}")
+                        return result
+                        
             except Exception as e:
                 self.log(f"Method {method_name} failed: {e}", "DEBUG")
                 continue
         
-        # All methods failed - return error with debug info
-        return {
-            "url": url,
-            "product_name": "Extraction Failed",
-            "error": "All extraction methods failed for this URL",
-            "timestamp": datetime.now().isoformat(),
-            "price": 0.0,
-            "product_images": [],
-            "description": "",
-            "debug_info": {
-                "methods_tried": [m[0] for m in methods],
-                "domain": urlparse(url).netloc,
-                "platform": self._get_platform(url)
-            }
-        }
+        # If we get here, return the best result even if price is 0
+        for method_name, method in reversed(methods):
+            try:
+                result = await method(url)
+                if result and ("product_name" in result or "product_images" in result):
+                    result["extraction_method"] = f"{method_name}_fallback"
+                    result["price_extraction_issue"] = "Price may be loaded dynamically"
+                    return result
+            except:
+                continue
+        
+        return self._create_error_result(url, "All extraction methods failed")
+    async def _wait_for_price_elements(self, page, timeout_seconds: int) -> bool:
+        """Wait specifically for price-related elements to load"""
+        try:
+            # Common price selectors to wait for
+            price_selectors = [
+                '.price', '.current-price', '.sale-price', '.regular-price',
+                '.woocommerce-Price-amount', '.amount', '[data-price]',
+                '.price .woocommerce-Price-amount.amount bdi'
+            ]
+            
+            # Wait for any price element to appear
+            for selector in price_selectors:
+                try:
+                    await page.wait_for_selector(selector, timeout=10000)  # 10s max per selector
+                    self.log(f"✅ Price element found with selector: {selector}")
+                    return True
+                except Exception as e:
+                    continue
+            
+            # Fallback: Wait for any element containing currency symbols
+            try:
+                await page.wait_for_function(
+                    """
+                    () => {
+                        const text = document.body.innerText;
+                        return /[₹$€£]|\\b(?:rs|rupees|dollars|euros|pounds)\\b/i.test(text);
+                    }
+                    """, 
+                    timeout=5000
+                )
+                self.log("✅ Currency symbol found in page text")
+                return True
+            except:
+                pass
+                
+            self.log("⚠️ No price elements found after waiting")
+            return False
+            
+        except Exception as e:
+            self.log(f"Error waiting for price elements: {e}", "DEBUG")
+            return False
     
+
+
     def _is_valid_product_data(self, data):
         """Check if extracted data is valid and meaningful"""
         if not data or not isinstance(data, dict):
@@ -345,155 +391,84 @@ class SimpleProductScraper:
                 continue
         
         return None
-    # Add this debug method to your SimpleProductScraper class to test specific URLs
-    async def debug_price_extraction_supercape(self, url: str):
-        """Debug price extraction for supercape.in specifically"""
-        print(f"\n🔍 DEBUGGING PRICE EXTRACTION FOR: {url}")
-        print("=" * 60)
+    async def _wait_for_price_with_retry(self, page) -> bool:
+        """Multiple strategies to wait for price loading"""
+        strategies = [
+            # Strategy 1: Wait for specific price selectors
+            lambda: page.wait_for_selector('.price, .amount, [data-price]', timeout=10000),
+            
+            # Strategy 2: Wait for any numeric content that looks like prices
+            lambda: page.wait_for_function(
+                """
+                () => {
+                    const elements = document.querySelectorAll('body *');
+                    for (let el of elements) {
+                        const text = el.textContent || '';
+                        if (text.match(/[₹$€£]\\s*\\d+/)) return true;
+                    }
+                    return false;
+                }
+                """, timeout=10000
+            ),
+            
+            # Strategy 3: Wait for specific WooCommerce price elements
+            lambda: page.wait_for_selector('.woocommerce-Price-amount, .price bdi', timeout=10000),
+            
+            # Strategy 4: Scroll and wait (triggers lazy loading)
+            lambda: page.evaluate("""async () => {
+                window.scrollTo(0, 300);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }""")
+        ]
         
-        try:
-            # Method 1: Try with HTTP first
-            print("1. TRYING HTTP REQUEST...")
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.get(url, headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                })
-                
-                if response.status_code == 200:
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    print(f"   ✅ HTTP request successful ({len(response.text)} chars)")
-                    
-                    # Check if this is a collection page (which won't have prices)
-                    product_links = soup.find_all('a', href=re.compile(r'/product/'))
-                    if len(product_links) > 1:
-                        print(f"   ⚠️  THIS IS A COLLECTION PAGE with {len(product_links)} product links")
-                        print("   💡 Individual product URLs:")
-                        for i, link in enumerate(product_links[:3]):
-                            href = link.get('href', '')
-                            if href.startswith('/'):
-                                href = 'https://supercape.in' + href
-                            print(f"      {i+1}. {href}")
-                        print("   🎯 Try testing with one of these individual product URLs instead!")
-                        return
-                    
-                    # Test different price selectors
-                    print("   🔍 TESTING PRICE SELECTORS:")
-                    selectors_to_test = [
-                        '.price .woocommerce-Price-amount.amount bdi',
-                        '.woocommerce-Price-amount.amount bdi',
-                        '.price bdi',
-                        '.price .amount',
-                        '.price',
-                        '.woocommerce-price-amount',
-                        '[class*="price"]',
-                        '.amount'
-                    ]
-                    
-                    found_any = False
-                    for i, selector in enumerate(selectors_to_test, 1):
-                        elements = soup.select(selector)
-                        print(f"   {i}. {selector}: {len(elements)} elements")
-                        
-                        for j, element in enumerate(elements[:2]):
-                            text = element.get_text(strip=True)
-                            if text:
-                                print(f"      Element {j+1}: '{text}'")
-                                
-                                # Test price parsing
-                                price = self._parse_price_universal(text)
-                                if price > 0:
-                                    print(f"      ✅ PRICE EXTRACTED: {price}")
-                                    found_any = True
-                                else:
-                                    print(f"      ❌ Could not parse price from: '{text}'")
-                    
-                    if not found_any:
-                        print("   ❌ NO PRICES FOUND WITH SELECTORS")
-                        
-                        # Try regex search in full page text
-                        print("\n   🔍 TRYING REGEX SEARCH IN PAGE TEXT:")
-                        page_text = soup.get_text()
-                        
-                        patterns = [
-                            r'₹\s*([0-9,]+(?:\.[0-9]{2})?)',
-                            r'Rs\.?\s*([0-9,]+(?:\.[0-9]{2})?)',
-                            r'Price[:\s]*₹?\s*([0-9,]+(?:\.[0-9]{2})?)',
-                            r'(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:rs|rupees)',
-                        ]
-                        
-                        regex_found = False
-                        for pattern in patterns:
-                            matches = re.findall(pattern, page_text, re.IGNORECASE)
-                            if matches:
-                                print(f"   ✅ Found with pattern '{pattern}': {matches[:3]}")
-                                regex_found = True
-                                break
-                        
-                        if not regex_found:
-                            print("   ❌ NO PRICES FOUND WITH REGEX EITHER")
-                    
-                    # Show some of the HTML structure for analysis
-                    print(f"\n   📋 HTML STRUCTURE ANALYSIS:")
-                    price_divs = soup.find_all(['div', 'span'], class_=re.compile(r'price|amount|cost', re.I))
-                    print(f"   Found {len(price_divs)} price-related elements:")
-                    
-                    for i, div in enumerate(price_divs[:5]):
-                        classes = ' '.join(div.get('class', []))
-                        text = div.get_text(strip=True)[:100]
-                        print(f"   {i+1}. <{div.name} class='{classes}'>{text}</div>")
-                
-                else:
-                    print(f"   ❌ HTTP request failed: {response.status_code}")
-            
-            # Method 2: Try with browser (for JS-loaded content)
-            print(f"\n2. TRYING BROWSER-BASED EXTRACTION...")
+        for i, strategy in enumerate(strategies):
             try:
-                async with async_playwright() as p:
-                    browser = await p.chromium.launch(headless=True)
-                    page = await browser.new_page()
-                    
-                    await page.goto(url, wait_until="domcontentloaded", timeout=20000)
-                    await asyncio.sleep(3)  # Wait for JS to load
-                    
-                    content = await page.content()
-                    await browser.close()
-                    
-                    soup_browser = BeautifulSoup(content, 'html.parser')
-                    print(f"   ✅ Browser content loaded ({len(content)} chars)")
-                    
-                    # Test if browser version has prices
-                    browser_price_elements = soup_browser.select('.price')
-                    print(f"   Found {len(browser_price_elements)} .price elements with browser")
-                    
-                    for i, elem in enumerate(browser_price_elements[:3]):
-                        text = elem.get_text(strip=True)
-                        print(f"   Browser price {i+1}: '{text}'")
-                        
-                        price = self._parse_price_universal(text)
-                        if price > 0:
-                            print(f"   ✅ BROWSER EXTRACTED PRICE: {price}")
-                            break
-                    
+                await strategy()
+                self.log(f"✅ Price loading strategy {i+1} successful")
+                return True
             except Exception as e:
-                print(f"   ❌ Browser extraction failed: {e}")
-            
-            print(f"\n📊 SUMMARY:")
-            print(f"   - URL accessible via HTTP: ✅")
-            print(f"   - Contains price elements: {'✅' if found_any else '❌'}")
-            print(f"   - Price extraction working: {'✅' if found_any else '❌'}")
-            
-            if not found_any:
-                print(f"\n💡 RECOMMENDATIONS:")
-                print(f"   1. Make sure you're testing INDIVIDUAL PRODUCT URLs, not collection pages")
-                print(f"   2. The site might load prices with JavaScript - try browser extraction")
-                print(f"   3. Check if the site has anti-bot protection")
-                print(f"   4. Verify the HTML structure matches what we expect")
-            
+                self.log(f"Price strategy {i+1} failed: {e}", "DEBUG")
+                continue
+        
+        return False
+    async def _extract_using_browser_extended(self, url: str) -> Optional[Dict[str, Any]]:
+        """Extended browser extraction with longer waits and price-specific retries"""
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                
+                try:
+                    # Longer timeouts for difficult pages
+                    page.set_default_timeout(45000)  # 45 seconds
+                    page.set_default_navigation_timeout(45000)
+                    
+                    # Navigate and wait for load
+                    await page.goto(url, wait_until="networkidle", timeout=45000)
+                    
+                    # Multiple strategies to ensure prices are loaded
+                    price_found = await self._wait_for_price_with_retry(page)
+                    
+                    # Final content extraction
+                    content = await page.content()
+                    soup = BeautifulSoup(content, 'html.parser')
+                    
+                    result = {
+                        "product_name": self._extract_product_name_universal(soup),
+                        "price": self._extract_price_universal(soup),
+                        "product_images": self._extract_images_universal(soup, url),
+                        "description": self._extract_description_universal(soup),
+                        "extraction_method": "browser_extended",
+                        "in_stock": self._extract_stock_from_html(soup),
+                    }
+                    
+                    return result
+                    
+                finally:
+                    await browser.close()
         except Exception as e:
-            print(f"❌ Debug failed: {e}")
-            import traceback
-            traceback.print_exc()
-
+            self.log(f"Extended browser extraction failed: {e}", "DEBUG")
+            return None
     def _extract_images_from_jsonld(self, data: Dict[str, Any]) -> List[str]:
         """Extract images from JSON-LD data"""
         images = []
@@ -650,36 +625,78 @@ class SimpleProductScraper:
             return result
         
         return None
+    #_extract_price_from_nested_spans method
     def _extract_price_from_nested_spans(self, soup: BeautifulSoup) -> float:
-        """Extract price from deeply nested span structures like WooCommerce"""
+        """Extract price from deeply nested span structures like WooCommerce with supercape.in specific handling"""
         
-        # Method 1: Target WooCommerce nested structure specifically
-        # <span class="price"><span class="woocommerce-Price-amount amount"><bdi>₹549.00</bdi></span></span>
-        
-        woocommerce_selectors = [
-            '.price .woocommerce-Price-amount.amount bdi',  # Most specific first
+        # SUPERCAPE.IN SPECIFIC SELECTORS FIRST
+        supercape_selectors = [
+            '.price .woocommerce-Price-amount.amount bdi',
+            '.etheme-product-grid-content .price .woocommerce-Price-amount.amount bdi',
             '.woocommerce-Price-amount.amount bdi',
-            '.price .amount bdi',
-            '.price bdi'
+            '.price bdi',
         ]
         
-        for selector in woocommerce_selectors:
+        # Debug: Print what we're working with
+        self.log(f"DEBUG: Looking for price elements...")
+        
+        for i, selector in enumerate(supercape_selectors, 1):
             try:
                 elements = soup.select(selector)
-                for element in elements:
-                    # Get all text from bdi element (includes currency symbol + price)
-                    full_text = element.get_text(strip=True)  # Gets "₹549.00"
+                self.log(f"DEBUG: Selector {i} '{selector}': found {len(elements)} elements")
+                
+                for j, element in enumerate(elements):
+                    # Get the raw text
+                    raw_text = element.get_text(strip=True)
+                    self.log(f"DEBUG: Element {j+1} raw text: '{raw_text}'")
                     
-                    if full_text:
-                        # Extract price using your existing universal parser
-                        price = self._parse_price_universal(full_text)
+                    if raw_text:
+                        # Parse the price
+                        price = self._parse_price_universal(raw_text)
+                        self.log(f"DEBUG: Parsed price: {price}")
+                        
                         if price > 0:
+                            self.log(f"SUCCESS: Extracted price {price} using selector '{selector}'")
                             return price
-            except:
+                            
+            except Exception as e:
+                self.log(f"DEBUG: Error with selector '{selector}': {e}")
                 continue
         
+        # FALLBACK: Try more generic selectors
+        fallback_selectors = [
+            '.price .amount',
+            '.price',
+            '.woocommerce-Price-amount',
+            '[class*="price"]',
+            '.amount'
+        ]
+        
+        self.log(f"DEBUG: Trying fallback selectors...")
+        
+        for i, selector in enumerate(fallback_selectors, 1):
+            try:
+                elements = soup.select(selector)
+                self.log(f"DEBUG: Fallback selector {i} '{selector}': found {len(elements)} elements")
+                
+                for j, element in enumerate(elements):
+                    raw_text = element.get_text(strip=True)
+                    self.log(f"DEBUG: Fallback element {j+1} text: '{raw_text}'")
+                    
+                    if raw_text and ('₹' in raw_text or 'rs' in raw_text.lower() or any(c.isdigit() for c in raw_text)):
+                        price = self._parse_price_universal(raw_text)
+                        self.log(f"DEBUG: Fallback parsed price: {price}")
+                        
+                        if price > 0:
+                            self.log(f"SUCCESS: Extracted price {price} using fallback selector '{selector}'")
+                            return price
+                            
+            except Exception as e:
+                self.log(f"DEBUG: Error with fallback selector '{selector}': {e}")
+                continue
+        
+        self.log(f"DEBUG: No price found with any selector")
         return 0.0
-
     async def _extract_using_static_html(self, url: str) -> Optional[Dict[str, Any]]:
         """Extract from static HTML using universal selectors"""
         try:
@@ -720,75 +737,127 @@ class SimpleProductScraper:
         
         return "Unknown Product"
     
-
+    
 
     # Update your existing _extract_price_universal method 
     # (Find this method in your code and replace it with this version)
     def _extract_price_universal(self, soup: BeautifulSoup) -> float:
-        """Extract price using universal selectors with nested span support"""
+        """Extract price using universal selectors with enhanced supercape.in support"""
         
-        # FIRST: Try the new nested span extraction for WooCommerce sites
+        self.log(f"DEBUG: Starting price extraction")
+        
+        # FIRST: Try supercape-specific nested extraction
         nested_price = self._extract_price_from_nested_spans(soup)
         if nested_price > 0:
+            self.log(f"SUCCESS: Got price from nested spans: {nested_price}")
             return nested_price
         
-        # EXISTING: Continue with your original universal selectors
-        for selector in self.universal_scraper.universal_selectors['price']:
-            elements = soup.select(selector)
-            for element in elements:
-                price_text = element.get_text(strip=True)
-                price = self._parse_price_universal(price_text)
-                if price > 0:
-                    return price
+        self.log(f"DEBUG: Nested spans failed, trying universal selectors")
         
+        # SECOND: Try universal selectors
+        for i, selector in enumerate(self.universal_scraper.universal_selectors['price'], 1):
+            try:
+                elements = soup.select(selector)
+                self.log(f"DEBUG: Universal selector {i} '{selector}': {len(elements)} elements")
+                
+                for j, element in enumerate(elements):
+                    price_text = element.get_text(strip=True)
+                    self.log(f"DEBUG: Universal element {j+1} text: '{price_text}'")
+                    
+                    if price_text:
+                        price = self._parse_price_universal(price_text)
+                        if price > 0:
+                            self.log(f"SUCCESS: Got price from universal selector: {price}")
+                            return price
+            except Exception as e:
+                self.log(f"DEBUG: Error with universal selector '{selector}': {e}")
+                continue
+        
+        self.log(f"DEBUG: All price extraction methods failed")
         return 0.0
     def _parse_price_universal(self, price_text: str) -> float:
-        """Universal price parser with improved logic"""
+        """Enhanced universal price parser with better Indian Rupee handling"""
         if not price_text:
+            self.log(f"DEBUG: Empty price text")
             return 0.0
         
-        # Remove all non-digit, non-decimal characters except commas and dots
-        cleaned = re.sub(r'[^\d.,]', '', str(price_text))
+        self.log(f"DEBUG: Parsing price text: '{price_text}'")
+        
+        import re
+        
+        # Step 1: Remove currency symbols and clean
+        # Handle Indian Rupee symbol specifically
+        cleaned = price_text
+        
+        # Remove various currency symbols
+        currency_symbols = ['₹', '$', '€', '£', '¥', '¢', '₨', '₩', '₪', 'Rs', 'rs', 'INR', 'inr']
+        for symbol in currency_symbols:
+            cleaned = cleaned.replace(symbol, '')
+        
+        # Remove currency words
+        cleaned = re.sub(r'\b(rupees?|dollars?|euros?|pounds?)\b', '', cleaned, flags=re.IGNORECASE)
+        
+        # Keep only digits, dots, commas, and spaces
+        cleaned = re.sub(r'[^\d.,\s]', '', cleaned)
+        cleaned = cleaned.strip()
+        
+        self.log(f"DEBUG: After cleaning: '{cleaned}'")
         
         if not cleaned:
+            self.log(f"DEBUG: No digits found after cleaning")
             return 0.0
         
-        # Handle different decimal separators and thousands separators
+        # Step 2: Handle different number formats
         try:
-            # Case 1: Has both comma and dot - determine which is decimal separator
+            # Remove spaces
+            cleaned = cleaned.replace(' ', '')
+            
+            # Case 1: Has both comma and dot
             if ',' in cleaned and '.' in cleaned:
+                # Find last comma and dot positions
                 last_comma = cleaned.rfind(',')
                 last_dot = cleaned.rfind('.')
                 
                 if last_comma > last_dot:
-                    # Comma is decimal separator (European style: 1.234,56)
+                    # Comma is decimal (1.234,56 format)
                     cleaned = cleaned.replace('.', '').replace(',', '.')
                 else:
-                    # Dot is decimal separator (US style: 1,234.56)
+                    # Dot is decimal (1,234.56 format)  
                     cleaned = cleaned.replace(',', '')
             
-            # Case 2: Only has comma
+            # Case 2: Only comma
             elif ',' in cleaned:
-                # Determine if comma is thousands separator or decimal separator
                 parts = cleaned.split(',')
                 if len(parts) == 2 and len(parts[1]) <= 2:
-                    # Likely decimal separator (price,50 or 10,99)
+                    # Decimal comma (499,00)
                     cleaned = cleaned.replace(',', '.')
                 else:
-                    # Likely thousands separator (1,000 or 1,000,000)
+                    # Thousands separator (1,000)
                     cleaned = cleaned.replace(',', '')
             
-            # Case 3: Only dots or no separators - use as is
+            # Case 3: Only dots or plain number - use as is
             
-            return float(cleaned)
+            self.log(f"DEBUG: Final cleaned for conversion: '{cleaned}'")
             
-        except ValueError:
-            # If conversion fails, try to extract first number
-            numbers = re.findall(r'\d+', cleaned)
-            if numbers:
-                return float(numbers[0])
+            result = float(cleaned)
+            self.log(f"DEBUG: Successfully converted to float: {result}")
+            return result
+            
+        except ValueError as e:
+            self.log(f"DEBUG: Float conversion failed: {e}")
+            
+            # Last resort: extract first sequence of digits
+            digits = re.findall(r'\d+', cleaned)
+            if digits:
+                try:
+                    result = float(digits[0])
+                    self.log(f"DEBUG: Fallback extraction: {result}")
+                    return result
+                except ValueError:
+                    pass
+            
+            self.log(f"DEBUG: All parsing attempts failed")
             return 0.0
-
     def _extract_images_universal(self, soup: BeautifulSoup, base_url: str) -> List[str]:
         """Extract product images using universal selectors"""
         images = []
@@ -826,7 +895,7 @@ class SimpleProductScraper:
         return ""
     
     async def _extract_using_browser(self, url: str, timeout_seconds: int) -> Optional[Dict[str, Any]]:
-        """Browser extraction with specified timeout"""
+        """Browser extraction with price-specific waiting"""
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
@@ -837,24 +906,21 @@ class SimpleProductScraper:
                     page.set_default_timeout(timeout_seconds * 1000)
                     page.set_default_navigation_timeout(timeout_seconds * 1000)
                     
-                    # Load with specified timeout
+                    # Load page
                     await page.goto(url, wait_until="domcontentloaded", timeout=timeout_seconds * 1000)
                     
-                    # Progressive waiting based on timeout
-                    if timeout_seconds >= 15:
-                        try:
-                            await page.wait_for_selector('h1, .price, .product-title', timeout=3000)
-                        except:
-                            pass
+                    # Wait specifically for price elements to load
+                    price_found = await self._wait_for_price_elements(page, timeout_seconds)
                     
-                    # Wait proportional to timeout
-                    await asyncio.sleep(min(timeout_seconds / 5, 4))
-                    
-                    if timeout_seconds >= 20:
+                    if not price_found:
+                        # If no price found, wait for network to be idle
                         try:
                             await page.wait_for_load_state("networkidle", timeout=5000)
                         except:
                             pass
+                    
+                    # Additional wait for dynamic content
+                    await asyncio.sleep(2)
                     
                     # Get content and parse
                     content = await page.content()
@@ -867,7 +933,7 @@ class SimpleProductScraper:
                         "description": self._extract_description_universal(soup),
                         "extraction_method": f"browser_{timeout_seconds}s_timeout",
                         "in_stock": self._extract_stock_from_html(soup),
-
+                        "price_wait_successful": price_found  # Debug info
                     }
                     
                 finally:
@@ -875,7 +941,6 @@ class SimpleProductScraper:
         except Exception as e:
             self.log(f"Browser extraction with {timeout_seconds}s failed: {e}", "DEBUG")
             return None
-
     async def _extract_universal_fallback(self, url: str) -> Optional[Dict[str, Any]]:
         """
         Universal fallback extraction for any website
@@ -1825,4 +1890,4 @@ if __name__ == "__main__":
         ]
         
         result = await scrape_urls_simple_api(test_urls, max_pages=10)
-        print(json.dumps(result, indent=2))
+        self.log(json.dumps(result, indent=2))
