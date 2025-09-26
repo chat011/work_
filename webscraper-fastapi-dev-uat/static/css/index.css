@@ -321,11 +321,31 @@ input:checked+.slider:before {
     transform: translateY(-1px);
 }
 
+/* Ensure product cards maintain consistent sizing */
+/* .product-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border 0.3s ease;
+    position: relative;
+    border: 2px solid transparent;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+} */
+
+
 .chat-messages {
     flex: 1;
     padding: 16px;
     overflow-y: auto;
     background: #fafafa;
+}
+/* Remove any flexbox contamination */
+.chat-messages > * {
+    display: block !important;
+    width: 100% !important;
 }
 
 .input-section {
@@ -1018,6 +1038,15 @@ input:checked+.slider:before {
     gap: 12px;
     align-items: center;
     flex-wrap: wrap;
+    margin-bottom: 20px !important;
+    
+
+}
+.products-section,
+.products-header,
+.products-actions {
+    display: block !important;
+    width: 100% !important;
 }
 
 .product-image {
@@ -1486,27 +1515,22 @@ button {
 }
 /* Add this to your index.css file - Products Grid Fix */
 
-.products-grid {
-    display: grid !important; /* Force grid layout */
-    grid-template-columns: repeat(3, 1fr); /* Always 3 columns */
-    gap: 16px;
-    margin-top: 16px;
-    width: 100%;
+.products-section {
+    margin-top: 20px;
+    display: block !important;
+    width: 100% !important;
 }
 
-/* Ensure consistent card sizing */
-.product-card {
-    background: white;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-    transition: transform 0.3s ease, box-shadow 0.3s ease, border 0.3s ease;
-    position: relative;
-    border: 2px solid transparent;
-    min-height: 350px; /* Ensure consistent height */
-    display: flex;
-    flex-direction: column;
+.products-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    width: 100%;
+    margin: 0;
+    padding: 0;
 }
+
+
 
 .product-card:hover {
     transform: translateY(-4px);
@@ -1518,57 +1542,28 @@ button {
     box-shadow: 0 8px 25px rgba(139, 92, 246, 0.3);
 }
 
-.product-image {
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-    background: #f1f5f9;
-    flex-shrink: 0;
-}
-
-.product-info {
-    padding: 15px;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-}
-
-.product-name {
-    font-weight: 600;
-    margin-bottom: 8px;
-    color: #1f2937;
-    font-size: 0.95rem;
-    line-height: 1.4;
-    flex-shrink: 0;
-}
-
-.product-price {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: #059669;
-    margin-bottom: 10px;
-    flex-shrink: 0;
-}
-
-.product-details {
-    font-size: 0.8rem;
-    color: #6b7280;
-    margin-bottom: 10px;
-    line-height: 1.4;
-    flex-grow: 1;
-}
-
-.product-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    margin-top: auto;
-}
-
 /* Responsive grid adjustments */
+@media (max-width: 1200px) {
+    .products-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 18px;
+    }
+}
+
 @media (max-width: 768px) {
     .products-grid {
-        grid-template-columns: repeat(2, 1fr); /* 2 columns on tablets */
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 15px;
+    }
+    
+    .product-card {
+        min-height: 350px;
+    }
+}
+
+@media (max-width: 480px) {
+    .products-grid {
+        grid-template-columns: 1fr;
         gap: 12px;
     }
     
@@ -1577,16 +1572,50 @@ button {
     }
 }
 
-@media (max-width: 480px) {
-    .products-grid {
-        grid-template-columns: 1fr; /* 1 column on mobile */
-        gap: 10px;
-    }
-    
-    .product-card {
-        min-height: 300px;
-    }
+/* Force remove any inline styles that might interfere */
+#productsGrid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+    gap: 20px !important;
+}
+
+/* Ensure the products section doesn't have flex properties */
+.products-section > *:not(.products-grid) {
+    width: 100%;
 }
 
 
 
+#productsGrid {
+    all: initial !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+    margin: 20px 0 !important;
+}
+
+
+.products-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+    gap: 20px !important;
+    width: 100% !important;
+    margin: 20px 0 !important;
+    padding: 0 !important;
+    grid-auto-flow: row !important;
+}
+
+
+.product-card {
+    all: initial !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: white !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07) !important;
+    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+    min-height: 380px !important;
+    break-inside: avoid !important;
+}

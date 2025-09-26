@@ -580,7 +580,36 @@ class FashionScraper {
         console.log('🚀 Starting WebSocket connection for task:', this.currentTaskId);
         this.connectWebSocket(this.currentTaskId);
     }
+debugGridLayout() {
+    const grid = document.getElementById("productsGrid");
+    if (!grid) {
+        console.error("❌ Products grid not found");
+        return;
+    }
 
+    console.log("🔍 Grid Debug Info:", {
+        element: grid,
+        inlineStyle: grid.getAttribute('style'),
+        computedDisplay: window.getComputedStyle(grid).display,
+        computedGridTemplateColumns: window.getComputedStyle(grid).gridTemplateColumns,
+        computedWidth: window.getComputedStyle(grid).width,
+        childrenCount: grid.children.length,
+        parent: grid.parentElement
+    });
+
+    // Force grid layout
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(300px, 1fr))';
+    grid.style.gap = '20px';
+    grid.style.width = '100%';
+    
+    // Remove any flex properties
+    grid.style.flex = '';
+    grid.style.flexDirection = '';
+    grid.style.flexWrap = '';
+    
+    console.log("✅ Grid layout enforced");
+}
 displayResults(result) {
     const products = result.products || [];
     const metadata = result.metadata || {};
@@ -618,9 +647,9 @@ displayResults(result) {
 
     this.currentProducts = products;
 
-    // Build products section directly (NOT inside addMessage)
+    // Build products section
     const productsSection = document.createElement("div");
-    productsSection.className = "products-section"; // Add a class for the entire section
+    productsSection.className = "products-section";
     
     productsSection.innerHTML = `
         <div class="products-header">
@@ -641,27 +670,75 @@ displayResults(result) {
 
     this.chatMessages.appendChild(productsSection);
 
-    // Setup listeners - NO STYLING CODE HERE
+    // Clean up any inline styles and setup event listeners
     setTimeout(() => {
+        this.debugGridLayout();
+        this.cleanupGridStyles();
         this.setupProductEventListeners();
-        
-        // Ensure grid properties are set correctly and remove any conflicting inline styles
-        const grid = document.getElementById("productsGrid");
-        if (grid) {
-            // Remove any inline styles that might interfere with CSS grid
-            grid.removeAttribute('style');
-            
-            // Force CSS grid properties if needed
-            grid.style.removeProperty('display'); // Let CSS handle it
-            
-            // Debug: Log the current state
-            console.log('Products grid setup:', {
-                element: grid,
-                computedStyle: window.getComputedStyle(grid).display,
-                childrenCount: grid.children.length
-            });
-        }
     }, 100);
+}
+
+// Add this cleanup method to remove any conflicting inline styles
+cleanupGridStyles() {
+    const grid = document.getElementById("productsGrid");
+    if (!grid) return;
+
+    // Remove all inline styles that might interfere with CSS grid
+    grid.removeAttribute('style');
+    
+    // Remove any flexbox properties
+    grid.style.display = 'grid';
+    grid.style.flexDirection = '';
+    grid.style.flexWrap = '';
+    grid.style.justifyContent = '';
+    grid.style.alignItems = '';
+    grid.style.flex = '';
+    
+    console.log('Grid styles cleaned up:', {
+        display: window.getComputedStyle(grid).display,
+        gridTemplateColumns: window.getComputedStyle(grid).gridTemplateColumns,
+        childrenCount: grid.children.length
+    });
+}
+
+// Update your setupProductEventListeners to remove ensureGridLayout call
+setupProductEventListeners() {
+    console.log('🔧 Setting up product event listeners...');
+    
+    // Select All button
+    const selectAllBtn = document.getElementById('selectAllBtn');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Select All button clicked');
+            this.selectAllProducts();
+        });
+    }
+
+    // Edit & Upload button  
+    const editUploadBtn = document.getElementById('editUploadBtn');
+    if (editUploadBtn) {
+        editUploadBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('✅ Edit & Upload button clicked');
+            this.editSelectedProducts();
+        });
+    }
+
+    // Product checkboxes with event delegation
+    const productsGrid = document.getElementById('productsGrid');
+    if (productsGrid) {
+        productsGrid.addEventListener('change', (e) => {
+            if (e.target && e.target.classList.contains('product-checkbox')) {
+                this.handleProductSelection();
+            }
+        });
+    }
+
+    // Initialize selection state
+    this.handleProductSelection();
 }
 
 
@@ -801,7 +878,8 @@ setupProductEventListeners() {
 }
     // UPDATED: Remove inline onclick handlers from createProductCard
 createProductCard(product, index) {
-    console.log('product price:',product)
+    console.log('product price:', product);
+    
     const price = product.price && product.price > 0 
         ? `₹${product.price.toLocaleString()}` 
         : 'Price not available';
@@ -809,6 +887,11 @@ createProductCard(product, index) {
     const image = product.product_images && product.product_images.length > 0
         ? product.product_images[0]
         : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K';
+
+    // Fix: Properly handle description - strip HTML tags and truncate
+    const description = product.description 
+        ? product.description.replace(/<[^>]*>/g, '').substring(0, 100) + (product.description.length > 100 ? '...' : '')
+        : 'No description available';
 
     const sizes = product.sizes && product.sizes.length > 0
         ? product.sizes.slice(0, 3).map(size => `<span class="tag">${size}</span>`).join('')
@@ -828,13 +911,11 @@ createProductCard(product, index) {
                     <i class="fas fa-check"></i>
                 </label>
             </div>
-            <img src="${image}" alt="${product.product_name}" class="product-image">
+            <img src="${image}" alt="${product.product_name}" class="product-image" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjFGNUY5Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwQzE1MCA4Mi4zNDMxIDE2NS4zNDMgNjcgMTgzIDY3QzIwMC42NTcgNjcgMjE2IDgyLjM0MzEgMjE2IDEwMEMyMTYgMTE3LjY1NyAyMDAuNjU3IDEzMyAxODMgMTMzQzE2NS4zNDMgMTMzIDE1MCAxMTcuNjU3IDE1MCAxMDBaIiBmaWxsPSIjQ0JENUUxIi8+CjxwYXRoIGQ9Ik0xMjAgMTMzSDE4MEwxNzAgMTUzSDE0MEwxMjAgMTMzWiIgZmlsbD0iI0NCRDVFMSIvPgo8L3N2Zz4K'">
             <div class="product-info">
                 <div class="product-name">${product.product_name || 'Unnamed Product'}</div>
                 <div class="product-price">${price}</div>
-                <div class="product-details">
-                    ${product.description ? product.description.substring(0, 100) + (product.description.length > 100 ? '...' : '') : 'No description available'}
-                </div>
+                <div class="product-details">${description}</div>
                 <div class="product-tags">
                     ${sizes}
                     ${colors}
