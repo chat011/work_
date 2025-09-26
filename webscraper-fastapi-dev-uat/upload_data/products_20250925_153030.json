@@ -1,0 +1,601 @@
+{
+  "metadata": {
+    "timestamp": "2025-09-25T10:00:30.703Z",
+    "total_products": 12,
+    "upload_type": "manual_edit",
+    "source": "edit_interface",
+    "sent_to_external": false,
+    "weights_included": true
+  },
+  "products": [
+    {
+      "product_name": "PISTACHIO PRINCESS GOWN",
+      "price": 8999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "DESCRIPTION - Introducing our \"Pistachio Princess Gown\", a captivating blend of elegance and playfulness. Crafted with meticulous attention to detail, this gown features a mesmerizing shade of pink and a voluminous skirt adorned with carefully placed ruffles. \nMATERIAL AND CARE - Net fabric , only dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e9619",
+        "option_value_name": "Cotton",
+        "sort_order": 1
+      },
+      "categories": [
+        {
+          "_id": "62b6e98a4ca342126d9c6d79",
+          "status": "1",
+          "category_name": "Sarees > Organic Cotton Sarees",
+          "parent_id": "601a4994c63f8b34c1b5f1eb"
+        }
+      ],
+      "categoryName": "Sarees > Organic Cotton Sarees",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/rn-image_picker_lib_temp_6d633f49-1f47-421c-8c1b-167d49a11f6c.jpg?v=1737206129&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Lilac Princess Purple Ball Gown",
+      "price": 10999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Introducing \"Lilac Princess,\" a stunning purple ball gown that embodies elegance and grace. TailorMade Clothing presents this enchanting creation, meticulously handcrafted to make you feel like royalty. Embrace your inner princess and captivate the crowd at formal events and special occasions with \"Lilac Princess.\"\n\n\n\nMATERIAL AND CARE -  Net fabric , dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e9619",
+        "option_value_name": "Cotton",
+        "sort_order": 1
+      },
+      "categories": [
+        {
+          "_id": "601a4e5cc63f8b34c1b5f21e",
+          "status": "1",
+          "category_name": "Bottom Wear > Causal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Causal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/rn-image_picker_lib_temp_9a12e0e7-3d08-425f-9386-d30589d1d3a6.jpg?v=1735998073&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "BLACK MERMAID GOWN",
+      "price": 4199,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Features:\n\nSoft fabric. \nMermaid look. \nPerfect for evenings and cocktail. \n\nMaterial:                                                                             velvet fabric\nCare Instructions:\n\nMachine wash or dry clean suggested.\n\nShipping:\n\nDelivery typically  within 7-10 business days.\n\nCustomization:\n     For customization you can either mail us or whatsapp us.\nNote:\n\nPlease refer to our size chart for accurate measurements.\nDue to variations in screen settings, the actual color of the dress may vary slightly.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e9619",
+        "option_value_name": "Cotton",
+        "sort_order": 1
+      },
+      "categories": [
+        {
+          "_id": "62d6d1c1c62feb75a49e495d",
+          "status": "1",
+          "category_name": "Bottom Wear > Formal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Formal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/rn-image_picker_lib_temp_4ed3a21a-5b12-4daf-bdd3-edf075ffada9.jpg?v=1733044592&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Blushing Ballerina Pink Ball Gown",
+      "price": 12599,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "DESCRIPTION - Introducing our \"Blushing Ballerina Ball Gown\", a captivating blend of elegance and playfulness. Crafted with meticulous attention to detail, this gown features a mesmerizing shade of pink and a voluminous skirt adorned with carefully placed ruffles. \nMATERIAL AND CARE - Net fabric , only dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "60547418e1680a3111d00738",
+          "option_value_name": "L",
+          "sort_order": 5,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca2f9680532780f4a17ccd",
+          "option_value_name": "Violet",
+          "sort_order": 6,
+          "color_code": "#ee82ee"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961d",
+        "option_value_name": "Neon",
+        "sort_order": 5
+      },
+      "categories": [
+        {
+          "_id": "62d6d226c62feb75a49e495f",
+          "status": "1",
+          "category_name": "Bottom Wear > Track Pants & Joggers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Track Pants & Joggers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/LIF_CW_ASA_Rv_D1_31.jpg?v=1694537135&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "White Swan Dress",
+      "price": 4999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Discover \"White swan \" a timeless white A-line gown by TailorMade Clothing. It exudes charm and elegance, making you feel like a graceful goddess. The flowing silhouette drapes beautifully, creating an enchanting presence. Embrace the divine allure and experience the magic of TailorMade Clothing's craftsmanship. Perfectly unique, elegant, and captivating—a lasting impression guaranteed.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e9619",
+        "option_value_name": "Cotton",
+        "sort_order": 1
+      },
+      "categories": [
+        {
+          "_id": "62d6d1c1c62feb75a49e495d",
+          "status": "1",
+          "category_name": "Bottom Wear > Formal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Formal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/IMG-0546.jpg?v=1715662791&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Bella Butterfly Ball Gown",
+      "price": 12999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Step into the world of cindrella with this beautiful ball gown!\n\n\n\n\nMATERIAL AND CARE - net fabric , dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961b",
+        "option_value_name": "Net",
+        "sort_order": 3
+      },
+      "categories": [
+        {
+          "_id": "601a4e5cc63f8b34c1b5f21e",
+          "status": "1",
+          "category_name": "Bottom Wear > Causal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Causal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/IMG-20231009_182037.jpg?v=1696860327&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Pistachio Princess Ball Gown",
+      "price": 9699,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Introducing our \"Pistachio Princess \"Green Ball Gown, a captivating masterpiece that exudes elegance and sophistication. This enchanting creation from TailorMade  features a stunning shade of green that is sure to make a statement.\nMATERIAL AND CARE -  Net fabric , dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961d",
+        "option_value_name": "Neon",
+        "sort_order": 5
+      },
+      "categories": [
+        {
+          "_id": "62d6d1c1c62feb75a49e495d",
+          "status": "1",
+          "category_name": "Bottom Wear > Formal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Formal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/LIF_CW_ASA_A7d_D1_66.jpg?v=1694538159&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Regal Affair Peach Ball Gown",
+      "price": 12499,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Introducing \"Regal Affair,\" a peach ball gown that embodies elegance and sophistication. TailorMade Clothing presents this enchanting creation, meticulously handcrafted to make you the center of attention. Experience the magic of TailorMade Clothing's craftsmanship with this exquisite peach ball gown.\nMATERIAL AND CARE -  Net fabric , dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "60547418e1680a3111d00735",
+          "option_value_name": "XS",
+          "sort_order": 2,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca2f9680532780f4a17ccd",
+          "option_value_name": "Violet",
+          "sort_order": 6,
+          "color_code": "#ee82ee"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961d",
+        "option_value_name": "Neon",
+        "sort_order": 5
+      },
+      "categories": [
+        {
+          "_id": "62d6d226c62feb75a49e495f",
+          "status": "1",
+          "category_name": "Bottom Wear > Track Pants & Joggers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Track Pants & Joggers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/LIF_CW_ASA_Rv_D2_138.jpg?v=1694805496&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Twilight Mystique Black Ball Gown",
+      "price": 9599,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Introducing \"Twilight Mystique,\" a black ball gown that emanates allure and sophistication. TailorMade Clothing presents this enchanting creation, meticulously handcrafted to ignite a sense of mystery. \n\nMATERIAL AND CARE -  Net fabric , dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "60547418e1680a3111d00738",
+          "option_value_name": "L",
+          "sort_order": 5,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca2f9680532780f4a17ccd",
+          "option_value_name": "Violet",
+          "sort_order": 6,
+          "color_code": "#ee82ee"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961d",
+        "option_value_name": "Neon",
+        "sort_order": 5
+      },
+      "categories": [
+        {
+          "_id": "62d6d226c62feb75a49e495f",
+          "status": "1",
+          "category_name": "Bottom Wear > Track Pants & Joggers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Track Pants & Joggers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/PIP05000.jpg?v=1694804344&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "ELSA PEARL GOWN",
+      "price": 5899,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Features:\n\nSoft fabric\nMini a line skirt\nPerfect for night. \n\nMaterial:\n       Velvet fabric\nCare Instructions:\n\nMachine wash or dry clean suggested.\n\nShipping:\n\nDelivery typically  within 7-10 business days.\n\nCustomization:\n     For customization you can either mail us or whatsapp us.\nNote:\n\nPlease refer to our size chart for accurate measurements.\nDue to variations in screen settings, the actual color of the dress may vary slightly.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "6554e4b70d9254bece34f663",
+          "option_value_name": "Free size",
+          "sort_order": 1,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca7b8880532780f4a1dddb",
+          "option_value_name": "Blue",
+          "sort_order": 1,
+          "color_code": "#0000ff"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961a",
+        "option_value_name": "Rayon",
+        "sort_order": 2
+      },
+      "categories": [
+        {
+          "_id": "601a4e5cc63f8b34c1b5f21e",
+          "status": "1",
+          "category_name": "Bottom Wear > Causal Trousers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Causal Trousers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/MTXX-MR20250109_190906064.jpg?v=1736438211&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.142Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "PINK BLUSH GOWN",
+      "price": 10999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "DESCRIPTION - Introducing our \"Blush Pink Ball Gown\", a captivating blend of elegance and playfulness. Crafted with meticulous attention to detail, this gown features a mesmerizing shade of pink and a voluminous skirt adorned with carefully placed ruffles. \nMATERIAL AND CARE - Net fabric , only dry clean suggested.\nRETURN AND EXCHANGE - Since the dress is made after customer places order as per the measurements of the customer, so it cannot be returned but can be exchanged if size is an issue.\nDELIVERY - Delivery within 10-15 working days.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "60547418e1680a3111d00738",
+          "option_value_name": "L",
+          "sort_order": 5,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "64ca2f9680532780f4a17ccd",
+          "option_value_name": "Violet",
+          "sort_order": 6,
+          "color_code": "#ee82ee"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961e",
+        "option_value_name": "Lycra",
+        "sort_order": 6
+      },
+      "categories": [
+        {
+          "_id": "62d6d200c62feb75a49e495e",
+          "status": "1",
+          "category_name": "Bottom Wear > Shorts",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Shorts",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/rn-image_picker_lib_temp_4ebd7a09-730b-46a1-9bb8-b9bc5f5e5469.jpg?v=1736687007&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.143Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    },
+    {
+      "product_name": "Dazzling Aurora Yellow Ball Gown",
+      "price": 10999,
+      "discounted_price": 0,
+      "premium": false,
+      "availability": "in-stock",
+      "description": "Introducing \"Dazzling Aurora,\" a radiant yellow ball gown that embodies beauty and captures the essence of a breathtaking sunrise. TailorMade Clothing presents this enchanting creation, meticulously handcrafted to make you shine at any event. Embrace the joy and sophistication of \"Dazzling Aurora\" and experience the magic of TailorMade Clothing's craftsmanship.",
+      "sizes": [
+        {
+          "status": "1",
+          "_id": "60547418e1680a3111d00738",
+          "option_value_name": "L",
+          "sort_order": 5,
+          "color_code": ""
+        }
+      ],
+      "colors": [
+        {
+          "status": "1",
+          "_id": "6509a8b877379f22b05e1791",
+          "option_value_name": "Black",
+          "sort_order": 5,
+          "color_code": "#000000"
+        }
+      ],
+      "material": {
+        "status": "1",
+        "_id": "615ecc7ece2599c2b42e961d",
+        "option_value_name": "Neon",
+        "sort_order": 5
+      },
+      "categories": [
+        {
+          "_id": "62d6d226c62feb75a49e495f",
+          "status": "1",
+          "category_name": "Bottom Wear > Track Pants & Joggers",
+          "parent_id": "601a4c9cc63f8b34c1b5f1fd"
+        }
+      ],
+      "categoryName": "Bottom Wear > Track Pants & Joggers",
+      "product_images": [
+        "https://www.tailormadeclothingstore.com/cdn/shop/files/LIF_CW_ASA_Rv_D2_336.jpg?v=1695057378&width=1920"
+      ],
+      "url": "",
+      "source_url": "",
+      "timestamp": "2025-09-25T10:00:25.143Z",
+      "extraction_method": "manual_edit",
+      "weight": 0.7
+    }
+  ],
+  "transformed_data": null
+}

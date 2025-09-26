@@ -36,6 +36,13 @@ from playwright.async_api import async_playwright
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+LOGS_BASE_DIR = pathlib.Path("logs")
+AI_AGENT_LOGS_DIR = LOGS_BASE_DIR / "ai_agent_logs"
+ENHANCED_LOGS_DIR = LOGS_BASE_DIR / "enhanced_logs" 
+CRON_LOGS_DIR = LOGS_BASE_DIR / "cron_logs"
+UPLOAD_LOGS_DIR = LOGS_BASE_DIR / "upload_logs"
+PRODUCT_UPLOAD_DIR = LOGS_BASE_DIR / "product_upload"
+PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="AI-Powered Web Scraper API", version="2.0.0")
 
@@ -574,73 +581,85 @@ async def get_task_status(task_id: str):
 
 @app.get("/api/tasks")
 async def list_available_tasks():
-    """List all available scraping tasks, prioritizing FIXED versions"""
+    """List all available scraping tasks, searching in all log directories"""
     try:
-        logs_dir = "logs"
-        if not os.path.exists(logs_dir):
-            return {
-                "success": True,
-                "tasks": [],
-                "message": "No logs directory found"
-            }
+        # Search all log directories
+        log_directories = [AI_AGENT_LOGS_DIR, ENHANCED_LOGS_DIR, CRON_LOGS_DIR, UPLOAD_LOGS_DIR, LOGS_BASE_DIR]
         
-        # Get all JSON files
-        json_files = glob.glob(os.path.join(logs_dir, "*.json"))
+        # Get all JSON files from all directories
+        json_files = []
+        for log_dir in log_directories:
+            if log_dir.exists():
+                json_files.extend(log_dir.glob("*.json"))
         
         # Group files by task ID
         tasks = {}
         
         for file_path in json_files:
-            filename = os.path.basename(file_path)
+            filename = file_path.name
             
-            # Extract task ID from filename
+            # Extract task ID and type from filename
             if filename.startswith('ai_agent_scrape_'):
-                # Remove prefix and extension
+                task_type = 'ai_agent'
                 task_part = filename.replace('ai_agent_scrape_', '').replace('.json', '')
+            elif filename.startswith('enhanced_scrape_'):
+                task_type = 'enhanced-universal'
+                task_part = filename.replace('enhanced_scrape_', '').replace('.json', '')
+            elif filename.startswith('cron_scrape_'):
+                task_type = 'cron'
+                task_part = filename.replace('cron_scrape_', '').replace('.json', '')
+            elif filename.startswith('uploadjson_'):
+                task_type = 'upload'
+                task_part = filename.replace('uploadjson_', '').replace('.json', '')
+            else:
+                task_type = 'unknown'
+                task_part = filename.replace('.json', '')
+            
+            # Check if it's a FIXED version
+            is_fixed = task_part.endswith('_FIXED')
+            if is_fixed:
+                task_id = task_part.replace('_FIXED', '')
+            else:
+                task_id = task_part
+            
+            # Read file metadata
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
                 
-                # Check if it's a FIXED version
-                is_fixed = task_part.endswith('_FIXED')
+                metadata = data.get('metadata', {})
+                products_count = len(data.get('products', []))
+                
+                if task_id not in tasks:
+                    tasks[task_id] = {
+                        'task_id': task_id,
+                        'task_type': task_type,
+                        'has_original': False,
+                        'has_fixed': False,
+                        'original_file': None,
+                        'fixed_file': None,
+                        'products_count': 0,
+                        'timestamp': metadata.get('timestamp', ''),
+                        'scraper_type': metadata.get('scraper_type', task_type),
+                        'ai_stats': metadata.get('ai_stats', {}),
+                        'urls_processed': metadata.get('urls_processed', 0),
+                        'log_directory': str(file_path.parent)
+                    }
+                
                 if is_fixed:
-                    task_id = task_part.replace('_FIXED', '')
+                    tasks[task_id]['has_fixed'] = True
+                    tasks[task_id]['fixed_file'] = filename
                 else:
-                    task_id = task_part
+                    tasks[task_id]['has_original'] = True
+                    tasks[task_id]['original_file'] = filename
                 
-                # Read file metadata
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+                # Use the count from the FIXED version if available, otherwise original
+                if is_fixed or not tasks[task_id]['has_fixed']:
+                    tasks[task_id]['products_count'] = products_count
                     
-                    metadata = data.get('metadata', {})
-                    products_count = len(data.get('products', []))
-                    
-                    if task_id not in tasks:
-                        tasks[task_id] = {
-                            'task_id': task_id,
-                            'has_original': False,
-                            'has_fixed': False,
-                            'original_file': None,
-                            'fixed_file': None,
-                            'products_count': 0,
-                            'timestamp': metadata.get('timestamp', ''),
-                            'scraper_type': metadata.get('scraper_type', 'unknown'),
-                            'ai_stats': metadata.get('ai_stats', {}),
-                            'urls_processed': metadata.get('urls_processed', 0)
-                        }
-                    
-                    if is_fixed:
-                        tasks[task_id]['has_fixed'] = True
-                        tasks[task_id]['fixed_file'] = filename
-                    else:
-                        tasks[task_id]['has_original'] = True
-                        tasks[task_id]['original_file'] = filename
-                    
-                    # Use the count from the FIXED version if available, otherwise original
-                    if is_fixed or not tasks[task_id]['has_fixed']:
-                        tasks[task_id]['products_count'] = products_count
-                        
-                except Exception as e:
-                    logger.warning(f"Error reading file {filename}: {e}")
-                    continue
+            except Exception as e:
+                logger.warning(f"Error reading file {filename}: {e}")
+                continue
         
         # Convert to list and sort by timestamp (newest first)
         tasks_list = list(tasks.values())
@@ -655,7 +674,7 @@ async def list_available_tasks():
             "success": True,
             "tasks": tasks_list,
             "total_tasks": len(tasks_list),
-            "message": f"Found {len(tasks_list)} scraping tasks"
+            "message": f"Found {len(tasks_list)} scraping tasks across all directories"
         }
         
     except Exception as e:
@@ -664,54 +683,73 @@ async def list_available_tasks():
 
 @app.get("/api/products/{task_id}")
 async def get_products_by_task_id(task_id: str):
-    """Get products from a specific task, prioritizing FIXED.json files"""
+    """Get products from a specific task, searching in all log directories"""
     try:
-        logs_dir = "logs"
-        
-        # First try to find the FIXED version
-        fixed_file_patterns = [
-            f"ai_agent_scrape_{task_id}_FIXED.json",
-            f"ai_agent_scrape_{task_id.replace('_', '')}_FIXED.json",
-            f"*{task_id}*_FIXED.json"
-        ]
-        
-        # Then try original versions as fallback
-        original_file_patterns = [
-            f"ai_agent_scrape_{task_id}.json",
-            f"ai_agent_scrape_{task_id.replace('_', '')}.json", 
-            f"*{task_id}*.json"
-        ]
+        # Search all log directories
+        log_directories = [AI_AGENT_LOGS_DIR, ENHANCED_LOGS_DIR, CRON_LOGS_DIR, UPLOAD_LOGS_DIR, LOGS_BASE_DIR]
         
         found_file = None
         is_fixed_version = False
         
-        # Look for FIXED version first
-        for pattern in fixed_file_patterns:
-            matching_files = glob.glob(os.path.join(logs_dir, pattern))
-            if matching_files:
-                found_file = matching_files[0]  # Take the first match
-                is_fixed_version = True
-                logger.info(f"🔧 Found FIXED version: {found_file}")
-                break
-        
-        # If no FIXED version found, look for original
-        if not found_file:
-            for pattern in original_file_patterns:
-                matching_files = glob.glob(os.path.join(logs_dir, pattern))
+        # Look for FIXED version first in all directories
+        for log_dir in log_directories:
+            if not log_dir.exists():
+                continue
+                
+            fixed_patterns = [
+                f"ai_agent_scrape_{task_id}_FIXED.json",
+                f"enhanced_scrape_{task_id}_FIXED.json", 
+                f"cron_scrape_{task_id}_FIXED.json",
+                f"uploadjson_{task_id}_FIXED.json",
+                f"*{task_id}*_FIXED.json"
+            ]
+            
+            for pattern in fixed_patterns:
+                matching_files = list(log_dir.glob(pattern))
                 if matching_files:
                     found_file = matching_files[0]
-                    logger.info(f"📄 Found original version: {found_file}")
+                    is_fixed_version = True
+                    logger.info(f"🔧 Found FIXED version: {found_file}")
+                    break
+            if found_file:
+                break
+        
+        # If no FIXED version found, look for original in all directories
+        if not found_file:
+            for log_dir in log_directories:
+                if not log_dir.exists():
+                    continue
+                    
+                original_patterns = [
+                    f"ai_agent_scrape_{task_id}.json",
+                    f"enhanced_scrape_{task_id}.json",
+                    f"cron_scrape_{task_id}.json", 
+                    f"uploadjson_{task_id}.json",
+                    f"*{task_id}*.json"
+                ]
+                
+                for pattern in original_patterns:
+                    matching_files = list(log_dir.glob(pattern))
+                    if matching_files:
+                        found_file = matching_files[0]
+                        logger.info(f"📄 Found original version: {found_file}")
+                        break
+                if found_file:
                     break
         
         if not found_file:
             # List available files for debugging
-            available_files = glob.glob(os.path.join(logs_dir, "*.json"))
+            available_files = []
+            for log_dir in log_directories:
+                if log_dir.exists():
+                    available_files.extend(log_dir.glob("*.json"))
+            
             logger.warning(f"No file found for task_id: {task_id}")
-            logger.info(f"Available files: {[os.path.basename(f) for f in available_files]}")
+            logger.info(f"Available files: {[f.name for f in available_files]}")
             
             raise HTTPException(
                 status_code=404, 
-                detail=f"No scraping results found for task ID: {task_id}. Available files: {[os.path.basename(f) for f in available_files]}"
+                detail=f"No scraping results found for task ID: {task_id}"
             )
         
         # Load and return the file
@@ -723,14 +761,20 @@ async def get_products_by_task_id(task_id: str):
         
         # Add information about which version was loaded
         metadata['loaded_from_fixed'] = is_fixed_version
-        metadata['loaded_file'] = os.path.basename(found_file)
+        metadata['loaded_file'] = str(found_file)
+        metadata['log_directory'] = str(found_file.parent)
         
-        # Determine scraper type
+        # Determine scraper type from filename if not in metadata
         scraper_type = metadata.get('scraper_type', 'unknown')
-        if 'ai_agent' in scraper_type or 'ai_stats' in metadata:
-            scraper_type = 'ai_agent'
-        elif 'simple' in scraper_type:
-            scraper_type = 'simple'
+        if scraper_type == 'unknown':
+            if 'ai_agent_scrape' in found_file.name:
+                scraper_type = 'ai_agent'
+            elif 'enhanced_scrape' in found_file.name:
+                scraper_type = 'enhanced-universal'
+            elif 'cron_scrape' in found_file.name:
+                scraper_type = 'cron'
+            elif 'uploadjson' in found_file.name:
+                scraper_type = 'upload'
         
         return {
             "success": True,
@@ -740,7 +784,8 @@ async def get_products_by_task_id(task_id: str):
             "scraper_type": scraper_type,
             "total_products": len(products),
             "is_fixed_version": is_fixed_version,
-            "loaded_file": os.path.basename(found_file),
+            "loaded_file": found_file.name,
+            "log_directory": str(found_file.parent),
             "message": f"Loaded {len(products)} products from {'FIXED' if is_fixed_version else 'original'} version"
         }
         
@@ -771,11 +816,15 @@ async def upload_products(request: UploadProductsRequest):
         
         # Transform products to external API format
         transformed_data = transform_to_external_format(products)
-        logger.info(transformed_data)
+        logger.info(f"Transformed {len(products)} products to API format")
+        
         # Create timestamp for this upload
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Prepare the upload data
+        # Save the exact API format before posting
+        api_file = save_product_upload_api_data(transformed_data, timestamp)
+        
+        # Prepare the upload data for our records
         upload_data = {
             "metadata": {
                 "timestamp": timestamp,
@@ -783,30 +832,31 @@ async def upload_products(request: UploadProductsRequest):
                 "upload_type": "manual_edit",
                 "source": metadata.get("source", "edit_interface"),
                 "sent_to_external": send_to_external,
+                "api_data_file": str(api_file) if api_file else None,
                 **metadata
             },
             "products": products,
             "transformed_data": transformed_data if send_to_external else None
         }
         
-        # Save to upload_data directory
-        upload_dir = "upload_data"
-        os.makedirs(upload_dir, exist_ok=True)
+        # Save to UPLOAD_LOGS_DIR directory (FIXED PATH)
+        upload_dir = UPLOAD_LOGS_DIR
+        upload_dir.mkdir(parents=True, exist_ok=True)
         
         # Create a filename with timestamp
-        filename = f"products_{timestamp}.json"
-        upload_file = os.path.join(upload_dir, filename)
+        filename = f"uploadjson_{timestamp}.json"
+        upload_file = upload_dir / filename
         
         with open(upload_file, 'w', encoding='utf-8') as f:
             json.dump(upload_data, f, indent=2, ensure_ascii=False)
         
-        logger.info(f"Successfully saved {len(products)} products to {upload_file}")
+        logger.info(f"✅ Successfully saved {len(products)} products to {upload_file}")
         
         # Send to external API if requested
         external_response = None
         if send_to_external:
             external_response = await send_to_external_api(transformed_data)
-            logger.info(f"Sent {len(products)} products to external API")
+            logger.info(f"✅ Sent {len(products)} products to external API")
         
         return {
             "success": True,
@@ -814,7 +864,8 @@ async def upload_products(request: UploadProductsRequest):
                       (" and sent to external API" if send_to_external else ""),
             "data": {
                 "products_count": len(products),
-                "upload_file": upload_file,
+                "upload_file": str(upload_file),
+                "api_data_file": str(api_file) if api_file else None,
                 "timestamp": timestamp,
                 "sent_to_external": send_to_external,
                 "external_response": external_response
@@ -822,12 +873,10 @@ async def upload_products(request: UploadProductsRequest):
         }
         
     except Exception as e:
-        logger.error(f"Error uploading products: {e}")
+        logger.error(f"❌ Error uploading products: {e}")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
-
-
 def transform_to_external_format(products):
-    """Transform products to external API format"""
+    """Transform products to exact external API format with dynamic category data"""
     transformed_products = []
     
     for product in products:
@@ -837,23 +886,30 @@ def transform_to_external_format(products):
             len(product.get("product_images", [])) == 0):
             continue
         
-        # Handle categories - extract category names if they're dictionaries
+        # Handle categories based on the provided structure
         categories = product.get("categories", [])
-        category_labels = []
+        category_label = "Uncategorized"
+        category_value = ""
         
-        for category in categories:
+        if categories and isinstance(categories, list) and len(categories) > 0:
+            # Take the first category object
+            category = categories[0]
             if isinstance(category, dict):
-                # Extract name from category dictionary if available
-                category_labels.append(category.get("name", ""))
-            else:
-                category_labels.append(str(category))
+                category_label = category.get("category_name", "Uncategorized")
+                category_value = f"{category.get('parent_id', '')} > {category.get('_id', '')}".strip(' > ')
         
-        # Basic product information
+        # Get source URL from the product data
+        source_url = product.get("source_url", product.get("url", ""))
+        
+        # Get quantity from upload data, default to 1 if not provided
+        quantity = str(product.get("stock", 1))  # Default to 1 if not provided
+        
+        # Exact format as required
         transformed = {
             "product_name": product.get("product_name", ""),
             "category_name": {
-                "label": " > ".join(category_labels) if category_labels else "Uncategorized",
-                "value": " > ".join([str(i) for i in range(len(category_labels))]) if category_labels else ""
+                "label": category_label,  # Dynamic from upload data
+                "value": category_value  # Dynamic from upload data
             },
             "description": product.get("description", ""),
             "status": "1",
@@ -867,18 +923,27 @@ def transform_to_external_format(products):
             "meta_tag_title": product.get("meta_title", ""),
             "meta_tag_description": product.get("meta_description", ""),
             "seo_url": product.get("slug", product.get("url", "")),
-            "variantPrices": [],
+            "source_url": source_url,
+            "variantPrices": [
+                {
+                    "rowId": 0,
+                    "variants": [],
+                    "quantity": quantity,  # Dynamic quantity, default 1
+                    "regularPrice": str(product.get("price", 1500)),
+                    "discountedPrice": str(product.get("discounted_price", product.get("price", 1400)))
+                }
+            ],
             "isPremium": False,
             "is_customize": 0,
             "variant_gender": "",
             "approximate_delivery_days": "",
             "selectedCustomizationFields": [],
-            "pickupAddressId": '',
+            "pickupAddressId": "",  # Fixed as per example
             "packageInfo": {
                 "weight": product.get("weight", 0.5),
                 "dimensions": {
                     "length": "35",
-                    "width": "24",
+                    "width": "24", 
                     "height": "5"
                 }
             },
@@ -894,19 +959,10 @@ def transform_to_external_format(products):
                 "media_type": "image"
             })
         
-        # Create variant structure
-        variant_price = {
-            "rowId": 0,
-            "variants": [],
-            "quantity": str(product.get("stock", 100)),
-            "regularPrice": str(product.get("price", 0)),
-            "discountedPrice": str(product.get("discounted_price", product.get("price", 0)))
-        }
-        
         # Add color variants if available
         if "colors" in product and product["colors"]:
             color_variant = {
-                "optionId": "",
+                "optionId": "601a67fd4e966936d4f475d4",
                 "optionName": "Color",
                 "optionValues": []
             }
@@ -916,12 +972,12 @@ def transform_to_external_format(products):
                     "value": color.get("id", ""),
                     "label": color.get("option_value_name", "")
                 })
-            variant_price["variants"].append(color_variant)
+            transformed["variantPrices"][0]["variants"].append(color_variant)
         
         # Add size variants if available
         if "sizes" in product and product["sizes"]:
             size_variant = {
-                "optionId": "",
+                "optionId": "601a68b54e966936d4f475db",
                 "optionName": "Size",
                 "optionValues": []
             }
@@ -931,7 +987,7 @@ def transform_to_external_format(products):
                     "value": size.get("_id", ""),
                     "label": size.get("option_value_name", "")
                 })
-            variant_price["variants"].append(size_variant)
+            transformed["variantPrices"][0]["variants"].append(size_variant)
         
         # Add material variants if available
         if "material" in product and product["material"]:
@@ -940,33 +996,49 @@ def transform_to_external_format(products):
                 "optionName": "Materials",
                 "optionValues": []
             }
-            # Handle material data - it might be a string or object
             material_data = product["material"]
             if isinstance(material_data, dict) and "_id" in material_data:
-                # Extract material info from the _id field
                 material_text = material_data["_id"]
+                material_label=material_data["option_value_name"]
                 material_variant["optionValues"].append({
                     "code": "",
-                    "value": material_text,  # Using the text as value
-                    "label": material_text   # Using the text as label
+                    "value": material_text,
+                    "label": material_label
                 })
             elif isinstance(material_data, str):
                 material_variant["optionValues"].append({
                     "code": "",
                     "value": material_data,
-                    "label": material_data
+                    "label": material_data["option_value_name"]
                 })
-            
-            variant_price["variants"].append(material_variant)
+            transformed["variantPrices"][0]["variants"].append(material_variant)
         
-        transformed["variantPrices"].append(variant_price)
         transformed_products.append(transformed)
     
     return {"products": transformed_products}
+
+def save_product_upload_api_data(transformed_data, timestamp):
+    """Save the exact API format to product_upload/product_upload_api_data.json"""
+    try:
+        # Ensure the directory exists
+        PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Save the exact API format
+        api_data_file = PRODUCT_UPLOAD_DIR / "product_upload_api_data.json"
+        
+        with open(api_data_file, 'w', encoding='utf-8') as f:
+            json.dump(transformed_data, f, indent=2, ensure_ascii=False)
+        
+        logger.info(f"✅ API data saved to: {api_data_file}")
+        return api_data_file
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving API data: {e}")
+        return None
 async def send_to_external_api(transformed_data):
     """Send transformed data to external API"""
     try:
-        external_api_url = "https://www.rte.in/api/product/upload-scraped-product-to-particular-sellers-dashboard"
+        external_api_url = "https://www.zotik.in/api/product/upload-scraped-product-to-particular-sellers-dashboard"
         
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -1059,6 +1131,7 @@ async def run_simple_scrape_task(task_id: str, urls: List[str], max_pages: int):
                 
                 product_data = await scraper.extract_product_data_hybrid(url)
                 if product_data and scraper._is_valid_product_data(product_data):
+                    product_data["source_url"] = url  # Individual product URL as source
                     all_products.append(product_data)
                     logger.info(f"✅ Scraped product: {product_data.get('product_name', 'Unknown')}")
                 else:
@@ -1212,6 +1285,9 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
                 products = await scraper._scrape_collection_with_pagination(
                     url, analysis, max_pages_per_url, detailed_progress_callback, base_progress + 15
                 )
+                for product in products:
+                    product["source_url"] = url  # Collection URL as source
+                    
                 all_products.extend(products)
                 total_pages_processed += len(analysis.pagination_info.page_urls) if analysis.pagination_info else 1
                 
@@ -1224,6 +1300,8 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
                 
                 product = await scraper._scrape_single_product_ai(html_content, url)
                 if product and "error" not in product:
+                    product["source_url"] = url  # Individual product URL as source
+
                     all_products.append(product)
                     scraper.stats["products_found"] += 1
                 total_pages_processed += 1
@@ -1245,17 +1323,14 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
                         
                         product = await scraper._scrape_single_product_by_url(product_url)
                         if product and "error" not in product:
+                            # ADD SOURCE URL TO THE PRODUCT
+                            product["source_url"] = product_url  # Individual product URL as source
                             all_products.append(product)
                             scraper.stats["products_found"] += 1
                     
                     total_pages_processed += len(analysis.product_links[:max_pages_per_url])
-        
-        # Post-process the scraped data
-        await detailed_progress_callback(
-            "post_processing", "image_fixing", 95,
-            "Fixing image URLs and sizes"
-        )
-        
+
+       
         result = {
             "products": all_products,
             "metadata": {
@@ -1267,6 +1342,14 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
                 "urls_processed": len(urls)
             }
         }
+        # Save original AI agent results first
+        await save_ai_agent_results(result, task_id)
+        
+        # Then post-process and save fixed results
+        await detailed_progress_callback(
+            "post_processing", "image_fixing", 95,
+            "Fixing image URLs and sizes"
+        )
         
         result = await post_process_scraped_data(result)
         
@@ -1317,13 +1400,135 @@ async def run_ai_scrape_task(task_id: str, urls: List[str], max_pages_per_url: i
             "type": "task_failed",
             "data": active_tasks[task_id]
         })
+async def save_ai_agent_results(result: Dict[str, Any], task_id: str):
+    """Save original AI agent results to AI_AGENT_LOGS_DIR"""
+    try:
+        timestamp = result.get('metadata', {}).get('timestamp', datetime.now().isoformat())
+        simple_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Save original version
+        original_file = AI_AGENT_LOGS_DIR / f"ai_agent_scrape_{simple_timestamp}.json"
+        
+        with open(original_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        
+        # Update metadata
+        if 'metadata' in result:
+            result['metadata']['original_file'] = str(original_file)
+            result['metadata']['task_id'] = task_id
+            result['metadata']['log_directory'] = str(AI_AGENT_LOGS_DIR)
+        
+        logger.info(f"✅ AI Agent results saved to: {original_file}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving AI agent results: {e}")
+
+async def save_simple_scraper_results(result: Dict[str, Any], task_id: str):
+    """Save original simple scraper results to ENHANCED_LOGS_DIR"""
+    try:
+        timestamp = result.get('metadata', {}).get('timestamp', datetime.now().isoformat())
+        simple_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Save original version
+        original_file = ENHANCED_LOGS_DIR / f"enhanced_scrape_{simple_timestamp}.json"
+        
+        with open(original_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        
+        # Update metadata
+        if 'metadata' in result:
+            result['metadata']['original_file'] = str(original_file)
+            result['metadata']['task_id'] = task_id
+            result['metadata']['log_directory'] = str(ENHANCED_LOGS_DIR)
+        
+        logger.info(f"✅ Enhanced scraper results saved to: {original_file}")
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving enhanced scraper results: {e}")
+
+
 # In api.py, update the startup_event function
+# @app.on_event("startup")
+# async def startup_event():
+#     # Load environment variables
+#     from dotenv import load_dotenv
+#     load_dotenv()
+    
+#     # Check if Gemini API key is available
+#     api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
+#     if not api_key:
+#         logger.warning("GEMINI_API_KEY or GOOGLE_API_KEY environment variable not found. AI features will be disabled.")
+#     else:
+#         logger.info("Gemini API key found. AI features are enabled.")
+    
+#     logger.info("🚀 AI-Powered Web Scraper API started successfully!")
+#     logger.info("📊 Available scrapers: Simple Parser, AI Agent (Gemini 1.5 Flash)")
+#     logger.info("🌐 GUI available at: http://localhost:8000/")
+#     logger.info("📚 API docs available at: http://localhost:8000/docs")
+#     logger.info("🔌 WebSocket support enabled for real-time updates")
+    
+#     # Create upload_data directory if it doesn't exist
+#     upload_dir = "upload_data"
+#     os.makedirs(upload_dir, exist_ok=True)
+#     logger.info(f"Ensured upload directory exists: {upload_dir}")
+#     # Create shared HTTP session with throttling
+#     app.state.http_session = ClientSession(
+#         connector=TCPConnector(limit_per_host=2),
+#         timeout=aiohttp.ClientTimeout(total=30)
+#     )
+# Another option - use a simpler timestamp format
+async def save_fixed_results(result: Dict[str, Any], timestamp: str, task_id: str):
+    """Save the fixed scraping results automatically in appropriate directory"""
+    try:
+        scraper_type = result.get('metadata', {}).get('scraper_type', 'unknown')
+        
+        # Determine which directory to use based on scraper type
+        if scraper_type == 'ai_agent':
+            logs_dir = AI_AGENT_LOGS_DIR
+            file_prefix = "ai_agent_scrape_"
+        elif scraper_type == 'enhanced-universal':
+            logs_dir = ENHANCED_LOGS_DIR
+            file_prefix = "enhanced_scrape_"
+        else:
+            logs_dir = LOGS_BASE_DIR  # fallback
+            file_prefix = "scrape_"
+        
+        # Use a simpler timestamp format without colons or periods
+        simple_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Save the fixed version
+        fixed_file = logs_dir / f"{file_prefix}{simple_timestamp}_FIXED.json"
+        
+        with open(fixed_file, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        
+        # Log the successful save
+        logger.info(f"✅ Fixed results saved to: {fixed_file}")
+        
+        # Update metadata to indicate this is the auto-fixed version
+        if 'metadata' in result:
+            result['metadata']['auto_fixed'] = True
+            result['metadata']['fixed_file'] = str(fixed_file)
+            result['metadata']['task_id'] = task_id
+            result['metadata']['log_directory'] = str(logs_dir)
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving fixed results: {e}")
+
+# Create a shared HTTP session for all requests
 @app.on_event("startup")
 async def startup_event():
     # Load environment variables
     from dotenv import load_dotenv
     load_dotenv()
     
+    # Create all log directories
+    LOGS_BASE_DIR.mkdir(parents=True, exist_ok=True)
+    AI_AGENT_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    ENHANCED_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    CRON_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOAD_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    PRODUCT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)  
     # Check if Gemini API key is available
     api_key = os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY')
     if not api_key:
@@ -1336,59 +1541,22 @@ async def startup_event():
     logger.info("🌐 GUI available at: http://localhost:8000/")
     logger.info("📚 API docs available at: http://localhost:8000/docs")
     logger.info("🔌 WebSocket support enabled for real-time updates")
-    
+    logger.info("📁 Log directories created:")
+    logger.info(f"   - AI Agent logs: {AI_AGENT_LOGS_DIR}")
+    logger.info(f"   - Enhanced logs: {ENHANCED_LOGS_DIR}")
+    logger.info(f"   - Cron logs: {CRON_LOGS_DIR}")
+    logger.info(f"   - Upload logs: {UPLOAD_LOGS_DIR}")
+    logger.info(f"   - Product upload API data: {PRODUCT_UPLOAD_DIR}")
     # Create upload_data directory if it doesn't exist
     upload_dir = "upload_data"
     os.makedirs(upload_dir, exist_ok=True)
     logger.info(f"Ensured upload directory exists: {upload_dir}")
-    # Create shared HTTP session with throttling
-    app.state.http_session = ClientSession(
-        connector=TCPConnector(limit_per_host=2),
-        timeout=aiohttp.ClientTimeout(total=30)
-    )
-# Another option - use a simpler timestamp format
-async def save_fixed_results(result: Dict[str, Any], timestamp: str, task_id: str):
-    """Save the fixed scraping results automatically"""
-    try:
-        logs_dir = "logs"
-        os.makedirs(logs_dir, exist_ok=True)
-        
-        # Use a simpler timestamp format without colons or periods
-        simple_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Save the fixed version
-        fixed_file = os.path.join(logs_dir, f"ai_agent_scrape_{simple_timestamp}_FIXED.json")
-        
-        with open(fixed_file, 'w', encoding='utf-8') as f:
-            json.dump(result, f, indent=2, ensure_ascii=False)
-        
-        # Log the successful save
-        logger.info(f"✅ Fixed results saved automatically to: {fixed_file}")
-        
-        # Update metadata to indicate this is the auto-fixed version
-        if 'metadata' in result:
-            result['metadata']['auto_fixed'] = True
-            result['metadata']['fixed_file'] = fixed_file
-            result['metadata']['task_id'] = task_id
-        
-    except Exception as e:
-        logger.error(f"❌ Error saving fixed results: {e}")
-
-# Create a shared HTTP session for all requests
-@app.on_event("startup")
-async def startup_event():
-    logger.info("🚀 AI-Powered Web Scraper API started successfully!")
-    logger.info("📊 Available scrapers: Simple Parser, AI Agent (Gemini 1.5 Flash)")
-    logger.info("🌐 GUI available at: http://localhost:8000/")
-    logger.info("📚 API docs available at: http://localhost:8000/docs")
-    logger.info("🔌 WebSocket support enabled for real-time updates")
     
     # Create shared HTTP session with throttling
     app.state.http_session = ClientSession(
         connector=TCPConnector(limit_per_host=2),
         timeout=aiohttp.ClientTimeout(total=30)
     )
-
 @app.on_event("shutdown")
 async def shutdown_event():
     # Close HTTP session

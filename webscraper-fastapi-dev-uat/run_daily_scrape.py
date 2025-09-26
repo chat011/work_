@@ -14,9 +14,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("daily_scrape")
 
 DATA_FILE = pathlib.Path("data/targets.json")
-LOGS_DIR = pathlib.Path("logs")
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-
+# LOGS_DIR = pathlib.Path("logs")
+# LOGS_DIR.mkdir(parents=True, exist_ok=True)
+cron_logs_dir = pathlib.Path("logs/cron_logs")
+cron_logs_dir.mkdir(parents=True, exist_ok=True)
 # Choose behavior: "latest" or "all"
 SCRAPE_MODE = "all"   # ✅ Always process all saved URLs, deduplicated
 
@@ -55,7 +56,7 @@ def main():
         sys.exit(1)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_file = LOGS_DIR / f"cron_scrape_{timestamp}.json"
+    out_file = cron_logs_dir  / f"cron_scrape_{timestamp}.json"
 
     try:
         logger.info(f"Starting scrape for {len(urls)} urls")

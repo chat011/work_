@@ -1639,55 +1639,70 @@ class SimpleProductScraper:
         current_url = url
         page_num = 1
 
+        # Move browser creation OUTSIDE the loop
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
 
-            while current_url and page_num <= max_pages:
-                self.log(f"Scraping page {page_num}: {current_url}")
-                
-                if progress_callback:
-                    await progress_callback({
-                        "stage": "scraping",
-                        "percentage": 10 + (page_num * 70 // max_pages),
-                        "details": f"Scraping page {page_num} of {max_pages}"
-                    })
-                
-                try:
-                    await page.goto(current_url, wait_until="domcontentloaded", timeout=25000)
+            try:
+                while current_url and page_num <= max_pages:
+                    self.log(f"Scraping page {page_num}: {current_url}")
+                    
+                    if progress_callback:
+                        await progress_callback({
+                            "stage": "scraping",
+                            "percentage": 10 + (page_num * 70 // max_pages),
+                            "details": f"Scraping page {page_num} of {max_pages}"
+                        })
+                    
                     try:
-                        await page.wait_for_load_state("networkidle", timeout=5000)
-                    except:
-                        pass
-                    content = await page.content()
-                    soup = BeautifulSoup(content, 'html.parser')
+                        await page.goto(current_url, wait_until="domcontentloaded", timeout=25000)
+                        try:
+                            await page.wait_for_load_state("networkidle", timeout=5000)
+                        except:
+                            pass
+                        content = await page.content()
+                        soup = BeautifulSoup(content, "html.parser")
 
-                    # Extract product links
-                    product_links = self._extract_product_links_universal(soup, current_url)
-                    self.log(f"Found {len(product_links)} product links on page {page_num}")
+                        # Extract product links
+                        product_links = self._extract_product_links_universal(soup, current_url)
+                        self.log(f"Found {len(product_links)} product links on page {page_num}")
 
-                    if not product_links:
-                        self.log("No product links found, stopping.", "WARNING")
-                        break
+                        if not product_links:
+                            self.log("No product links found, stopping.", "WARNING")
+                            break
 
-                    # Scrape products in parallel using hybrid method
-                    products = await self.scrape_all_products_hybrid(product_links, browser)
-                    all_products.extend(products)
-
-                    # Enhanced pagination detection
-                    next_page_url = self._find_next_page_url_universal(soup, current_url, page_num)
-                    if next_page_url and next_page_url != current_url:
-                        current_url = next_page_url
-                        page_num += 1
-                    else:
-                        self.log("No more pages found", "INFO")
-                        break
+                        # Scrape products using the hybrid method (NOT passing the browser)
+                        products = await self.scrape_all_products_hybrid(product_links)
                         
-                except Exception as e:
-                    self.log(f"Error scraping page {page_num}: {e}", "ERROR")
-                    break
+                        # ADD INDIVIDUAL PRODUCT URL AS SOURCE URL FOR EACH PRODUCT
+                        for product, product_url in zip(products, product_links):
+                            if product and self._is_valid_product_data(product):
+                                product["source_url"] = product_url  # Individual product page URL
+                                all_products.append(product)
 
-            await browser.close()
+                        # Enhanced pagination detection
+                        next_page_url = self._find_next_page_url_universal(soup, current_url, page_num)
+                        if next_page_url and next_page_url != current_url:
+                            current_url = next_page_url
+                            page_num += 1
+                        else:
+                            self.log("No more pages found", "INFO")
+                            break
+                            
+                    except Exception as e:
+                        self.log(f"Error scraping page {page_num}: {e}", "ERROR")
+                        # Don't break immediately, try to continue to next page
+                        if page_num < max_pages:
+                            page_num += 1
+                            continue
+                        else:
+                            break
+
+            finally:
+                # Close browser ONLY after all pages are processed
+                await browser.close()
+                
         return all_products
 
     def _find_next_page_url_universal(self, soup: BeautifulSoup, current_url: str, current_page: int) -> Optional[str]:
@@ -1769,14 +1784,18 @@ class SimpleProductScraper:
         
         return None
 
-    async def scrape_all_products_hybrid(self, urls: List[str], browser, concurrency: int = 5):
+    async def scrape_all_products_hybrid(self, urls: List[str], concurrency: int = 5):
         """Enhanced parallel product scraping with multiple fallback methods"""
         semaphore = asyncio.Semaphore(concurrency)
         
         async def scrape_with_semaphore(url):
             async with semaphore:
                 # Try the enhanced hybrid method
-                return await self.extract_product_data_hybrid(url)
+                product_data = await self.extract_product_data_hybrid(url)
+                # Add the individual product URL as source
+                if product_data and self._is_valid_product_data(product_data):
+                    product_data["source_url"] = url  # Individual product page URL
+                return product_data
         
         # Use asyncio.gather with return_exceptions to continue even if some fail
         results = await asyncio.gather(*[scrape_with_semaphore(u) for u in urls], return_exceptions=True)
@@ -1803,9 +1822,6 @@ async def scrape_urls_simple_api(
 ) -> Dict[str, Any]:
     """
     Enhanced Simple API function to scrape ALL product data from ANY e-commerce website
-    - Handles full pagination
-    - Deduplicates product URLs
-    - Ensures stock details are included
     """
     scraper = SimpleProductScraper(log_callback, progress_callback)
 
@@ -1823,7 +1839,7 @@ async def scrape_urls_simple_api(
             if scraper.is_collection_url(url):
                 scraper.log(f"Detected collection page: {url}")
 
-                # ✅ Extract all product links across pages
+                # Extract all product links across pages
                 product_links = await scraper.extract_collection_links(url, max_pages=max_pages)
 
                 scraper.log(f"Found {len(product_links)} product links in collection {url}")
@@ -1838,7 +1854,7 @@ async def scrape_urls_simple_api(
                             total_pages_scraped += 1
 
             else:
-                # ✅ Direct product page
+                # Direct product page
                 if url not in seen_urls:
                     seen_urls.add(url)
                     scraper.update_progress("scraping_products", 50, f"Scraping product {url}")
@@ -1850,7 +1866,7 @@ async def scrape_urls_simple_api(
         scraper.update_progress("completed", 100, f"Completed! Found {len(all_products)} unique products")
         scraper.log("Enhanced universal scraping completed successfully", "SUCCESS")
 
-        # ✅ Final result with metadata
+        # Final result with metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         result = {
             "metadata": {
@@ -1865,10 +1881,10 @@ async def scrape_urls_simple_api(
             "products": all_products
         }
 
-        # Save results into logs
-        logs_dir = "logs"
-        os.makedirs(logs_dir, exist_ok=True)
-        output_file = os.path.join(logs_dir, f"enhanced_scrape_{timestamp}.json")
+        # Save results into enhanced_logs directory
+        enhanced_logs_dir = pathlib.Path("logs/enhanced_logs")
+        enhanced_logs_dir.mkdir(parents=True, exist_ok=True)
+        output_file = enhanced_logs_dir / f"enhanced_scrape_{timestamp}.json"
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
 
@@ -1879,7 +1895,6 @@ async def scrape_urls_simple_api(
         scraper.log(f"Error in enhanced universal scraping: {e}", "ERROR")
         scraper.log(f"Traceback: {traceback.format_exc()}", "ERROR")
         raise e
-
 if __name__ == "__main__":
     # Test the enhanced scraper
     async def test_enhanced_scraper():
